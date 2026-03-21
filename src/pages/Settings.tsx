@@ -431,11 +431,6 @@ export default function SettingsPage() {
         </button>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">{t("settings.theme")}</label>
-          <PillRadio options={["Light", "Dark", "System"]} value={theme} onChange={(v) => updatePrefs({ theme: v })} />
-        </div>
-
-        <div className="space-y-2">
           <label className="text-sm font-medium">{t("settings.language")}</label>
           <select
             value={language}
@@ -450,10 +445,7 @@ export default function SettingsPage() {
           </select>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t("settings.fontSize")}</label>
-          <PillRadio options={["Default", "Large"]} value={fontSize} onChange={(v) => updatePrefs({ fontSize: v })} />
-        </div>
+
       </div>
 
       {/* Delete confirmation modal */}
