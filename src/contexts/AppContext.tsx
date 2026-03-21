@@ -49,6 +49,8 @@ interface AppContextType {
   intakeSurveyCompleted: boolean;
   appLoading: boolean;
   personalisation: PersonalisationSettings;
+  dateOfBirth: string | null;
+  primaryConcerns: string[];
   riskLevel: "Calm" | "Elevated" | "Trigger Risk";
   updatePersonalisation: (patch: Partial<PersonalisationSettings>) => Promise<void>;
   markIntakeSurveyCompleted: () => Promise<void>;
@@ -101,6 +103,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [personalisation, setPersonalisation] = useState<PersonalisationSettings>(DEFAULT_PERSONALISATION);
   const [psId, setPsId] = useState<string | null>(null);
   const [riskLevel, setRiskLevel] = useState<"Calm" | "Elevated" | "Trigger Risk">("Calm");
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
+  const [primaryConcerns, setPrimaryConcerns] = useState<string[]>([]);
   const prevUserId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -111,6 +115,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIntakeSurveyCompleted(false);
       setPersonalisation(DEFAULT_PERSONALISATION);
       setPsId(null);
+      setDateOfBirth(null);
+      setPrimaryConcerns([]);
       return;
     }
 
@@ -124,7 +130,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from("profiles").select("full_name, created_at").eq("user_id", user.id).maybeSingle(),
         supabase.from("personalisation_settings").select("*").eq("user_id", user.id).maybeSingle(),
         role === "client"
-          ? supabase.from("client_profiles").select("intake_survey_completed").eq("id", user.id).maybeSingle()
+          ? supabase
+              .from("client_profiles")
+              .select("intake_survey_completed, date_of_birth, primary_concerns")
+              .eq("id", user.id)
+              .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
       ]);
 
@@ -135,8 +145,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       if (role === "specialist") {
         setIntakeSurveyCompleted(true);
+        setDateOfBirth(null);
+        setPrimaryConcerns([]);
       } else {
         setIntakeSurveyCompleted(cpRes.data?.intake_survey_completed ?? false);
+        setDateOfBirth(cpRes.data?.date_of_birth ?? null);
+        setPrimaryConcerns(cpRes.data?.primary_concerns ?? []);
       }
 
       if (psRes.data) {
@@ -216,6 +230,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         intakeSurveyCompleted,
         appLoading,
         personalisation,
+        dateOfBirth,
+        primaryConcerns,
         riskLevel,
         updatePersonalisation,
         markIntakeSurveyCompleted,
