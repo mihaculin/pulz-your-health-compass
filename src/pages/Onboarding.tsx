@@ -23,6 +23,7 @@ interface OnboardingData {
   emotionSliders: Record<string, number>;
   triggers: string[];
   conditions: string[];
+  otherCondition: string;
   specialistCode: string;
   connectedDevice: string | null;
   theme: string;
@@ -43,6 +44,7 @@ const DEFAULT: OnboardingData = {
   emotionSliders: { Anxiety: 3, Stress: 3, "Low mood": 3, Irritability: 3 },
   triggers: [],
   conditions: [],
+  otherCondition: "",
   specialistCode: "",
   connectedDevice: null,
   theme: "aqua-bloom",
@@ -54,7 +56,7 @@ const DEFAULT: OnboardingData = {
 
 const FOOD_CONCERNS = ["Binge eating", "Restrictive eating", "Emotional eating", "Purging behaviours", "Overeating", "Food anxiety", "Body image concerns", "None of the above"];
 const TRIGGERS = ["Work stress", "Relationships", "Loneliness", "Financial stress", "Health concerns", "Body image", "Social situations", "Other"];
-const CONDITIONS = ["Diabetes", "PCOS", "IBS / digestive issues", "Thyroid condition", "Chronic pain", "Mental health diagnosis", "None"];
+const CONDITIONS = ["Diabetes", "PCOS", "IBS / digestive issues", "Thyroid condition", "Chronic pain", "Mental health diagnosis", "None", "Other"];
 const DEVICES = [
   { id: "apple_watch", label: "Apple Watch", icon: Watch, color: "#1C1C1E" },
   { id: "garmin", label: "Garmin", icon: Activity, color: "#006E51" },
@@ -165,7 +167,11 @@ export default function Onboarding() {
         const prev = (existing.data?.intake_survey_responses as Record<string, unknown>) ?? {};
         await supabase.from("client_profiles").update({
           co_occurring_conditions: data.conditions,
-          intake_survey_responses: { ...prev, specialist_code: data.specialistCode },
+          intake_survey_responses: {
+            ...prev,
+            specialist_code: data.specialistCode,
+            other_condition: data.otherCondition || null,
+          },
         }).eq("id", user.id);
       }
       if (s === 5 && data.connectedDevice) {
@@ -303,6 +309,7 @@ function Step3({ data, update, toggle }: { data: OnboardingData; update: <K exte
 }
 
 function Step4({ data, update, toggle }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; toggle: (k: "foodConcerns" | "triggers" | "conditions", item: string) => void }) {
+  const otherSelected = data.conditions.includes("Other");
   return (
     <div className="space-y-6">
       <div><h2 className="text-2xl font-heading font-semibold mb-1">Physical health</h2><p className="text-sm text-muted-foreground">Helps PULZ contextualise your physiological patterns.</p></div>
@@ -316,6 +323,17 @@ function Step4({ data, update, toggle }: { data: OnboardingData; update: <K exte
             </button>
           ))}
         </div>
+        {otherSelected && (
+          <input
+            type="text"
+            value={data.otherCondition}
+            onChange={(e) => update("otherCondition", e.target.value)}
+            placeholder="Please describe your condition…"
+            autoFocus
+            className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none transition-all"
+            style={{ borderColor: "#b3ecec" }}
+          />
+        )}
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">Specialist code <span className="text-muted-foreground font-normal">(optional)</span></label>
