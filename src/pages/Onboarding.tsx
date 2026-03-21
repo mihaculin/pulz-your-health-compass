@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { THEMES } from "@/lib/theme";
+import { useToast } from "@/hooks/use-toast";
 
 const TOTAL_STEPS = 7;
 
@@ -127,6 +128,7 @@ export default function Onboarding() {
   const { user } = useAuth();
   const { updatePersonalisation, markIntakeSurveyCompleted, refreshProfile } = useApp();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const update = <K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) =>
     setData((prev) => ({ ...prev, [key]: value }));
@@ -153,7 +155,7 @@ export default function Onboarding() {
         height_cm: toCm(data.height, data.heightUnit),
         weight_kg: toKg(data.weight, data.weightUnit),
       }, { onConflict: "id" });
-      if (error) console.error("[onboarding step 1]", error);
+      if (error) { console.error("[onboarding step 1]", error); toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
 
     if (s === 2) {
@@ -161,7 +163,7 @@ export default function Onboarding() {
         id: user.id,
         primary_concerns: data.foodConcerns,
       }, { onConflict: "id" });
-      if (error) console.error("[onboarding step 2]", error);
+      if (error) { console.error("[onboarding step 2]", error); toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
 
     if (s === 3) {
@@ -171,7 +173,7 @@ export default function Onboarding() {
         id: user.id,
         intake_survey_responses: { ...prev, emotional_patterns: data.emotionSliders, triggers: data.triggers },
       }, { onConflict: "id" });
-      if (error) console.error("[onboarding step 3]", error);
+      if (error) { console.error("[onboarding step 3]", error); toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
 
     if (s === 4) {
@@ -186,7 +188,7 @@ export default function Onboarding() {
           other_condition: data.otherCondition || null,
         },
       }, { onConflict: "id" });
-      if (error) console.error("[onboarding step 4]", error);
+      if (error) { console.error("[onboarding step 4]", error); toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
 
     if (s === 5 && data.connectedDevice) {
@@ -196,7 +198,7 @@ export default function Onboarding() {
         source_platform: data.connectedDevice,
         is_active: true,
       });
-      if (error) console.error("[onboarding step 5]", error);
+      if (error) { console.error("[onboarding step 5]", error); toast({ title: "Device connection failed", description: error.message, variant: "destructive" }); }
     }
 
     if (s === 6) {

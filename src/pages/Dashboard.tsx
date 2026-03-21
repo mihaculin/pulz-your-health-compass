@@ -43,7 +43,7 @@ type RiskRow = Tables<"risk_windows">;
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { fullName, riskLevel, setRiskLevel, hasDevice } = useApp();
+  const { fullName, riskLevel, setRiskLevel, hasDevice, primaryConcerns } = useApp();
   const navigate = useNavigate();
   const [watchOpen, setWatchOpen] = useState(false);
   const [interventionOpen, setInterventionOpen] = useState(false);
@@ -129,6 +129,13 @@ export default function Dashboard() {
               <p className="text-muted-foreground mt-1 text-sm">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </p>
+              {primaryConcerns.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {primaryConcerns.map((c) => (
+                    <span key={c} className="chip-trigger px-2 py-0.5 rounded-full text-xs">{c}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${style.badge}`}>{riskLevel}</span>

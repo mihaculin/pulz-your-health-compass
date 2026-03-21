@@ -52,6 +52,7 @@ interface AppContextType {
   weightKg: number | null;
   conditions: string[];
   specialistCode: string | null;
+  surveyTriggers: string[];
   riskLevel: "Calm" | "Elevated" | "Trigger Risk";
   updatePersonalisation: (patch: Partial<PersonalisationSettings>) => Promise<void>;
   markIntakeSurveyCompleted: () => Promise<void>;
@@ -111,6 +112,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [conditions, setConditions] = useState<string[]>([]);
   const [specialistCode, setSpecialistCode] = useState<string | null>(null);
+  const [surveyTriggers, setSurveyTriggers] = useState<string[]>([]);
   const prevUserId = useRef<string | null>(null);
 
   const refreshProfile = () => {
@@ -133,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setWeightKg(null);
       setConditions([]);
       setSpecialistCode(null);
+      setSurveyTriggers([]);
       return;
     }
 
@@ -156,6 +159,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ]);
       setHasDevice(!!deviceRes.data);
 
+      console.log("[AppContext] client_profiles data:", cpRes.data);
+      console.log("[AppContext] client_profiles error:", cpRes.error);
+      console.log("[AppContext] personalisation_settings data:", psRes.data);
+      console.log("[AppContext] personalisation_settings error:", psRes.error);
+
       if (profileRes.data) {
         setFullName(profileRes.data.full_name ?? "");
         setJoinedAt(profileRes.data.created_at);
@@ -171,6 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setWeightKg(null);
         setConditions([]);
         setSpecialistCode(null);
+        setSurveyTriggers([]);
       } else {
         const dbCompleted = cpRes.data?.intake_survey_completed ?? false;
         const completed = dbCompleted || localOnboardingDone;
@@ -188,6 +197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setConditions((cpRes.data as any)?.co_occurring_conditions ?? []);
         const isr = (cpRes.data as any)?.intake_survey_responses;
         setSpecialistCode(isr?.specialist_code ?? null);
+        setSurveyTriggers(isr?.triggers ?? []);
       }
 
       if (psRes.data) {
@@ -273,6 +283,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         weightKg,
         conditions,
         specialistCode,
+        surveyTriggers,
         riskLevel,
         updatePersonalisation,
         markIntakeSurveyCompleted,

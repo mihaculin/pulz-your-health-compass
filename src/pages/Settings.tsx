@@ -19,7 +19,7 @@ const DEFAULT_PREFS = {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted } = useApp();
+  const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted, appLoading } = useApp();
   const { user, role } = useAuth();
 
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
@@ -195,6 +195,20 @@ export default function SettingsPage() {
   const lastSyncLabel = device?.lastSync ? new Date(device.lastSync).toLocaleString() : "—";
   const hasSpecialist = Boolean(specialistName);
 
+  if (appLoading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6 pb-16">
+        <div className="slide-up">
+          <h1 className="text-2xl lg:text-3xl font-heading font-semibold">Settings</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Profile & preferences</p>
+        </div>
+        {[120, 80, 80, 60].map((h, i) => (
+          <div key={i} className="bg-muted rounded-xl animate-pulse" style={{ height: h }} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6 pb-16">
       {/* Header */}
@@ -219,12 +233,14 @@ export default function SettingsPage() {
             <h2 className="font-heading font-semibold text-lg">{fullName || "—"}</h2>
             <p className="text-sm text-muted-foreground">Age {age ?? "—"}</p>
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {primaryConcerns.length ? (
+              {primaryConcerns.length > 0 ? (
                 primaryConcerns.map((c) => (
                   <span key={c} className="chip-trigger px-2.5 py-1 rounded-full text-xs">{c}</span>
                 ))
+              ) : intakeSurveyCompleted ? (
+                <span className="text-xs text-muted-foreground">No concerns added</span>
               ) : (
-                <span className="text-xs text-muted-foreground">No concerns set yet</span>
+                <span className="text-xs text-muted-foreground">Complete your profile to add concerns</span>
               )}
             </div>
             {(heightCm || weightKg) && (

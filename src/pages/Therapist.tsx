@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useApp } from "@/contexts/AppContext";
 
 const weekData = [
   { label: "Week 1", range: "Mar 1–7", episodes: 18, avg: 7.2, bars: [3, 2, 4, 2, 3, 2, 2], note: "High frequency, establishing baseline" },
@@ -46,6 +47,7 @@ function MiniSparkline({ bars }: { bars: number[] }) {
 }
 
 export default function Therapist() {
+  const { fullName, primaryConcerns } = useApp();
   const [weekNotes, setWeekNotes] = useState<Record<number, string>>({});
   const [journalComments, setJournalComments] = useState<Record<number, string>>({});
   const [specialistNotes, setSpecialistNotes] = useState("");
@@ -60,9 +62,9 @@ export default function Therapist() {
       >
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="font-heading font-medium text-[22px]">Specialist View — Andrada M.</h1>
+            <h1 className="font-heading font-medium text-[22px]">Specialist View — {fullName || "—"}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Dr. Mihai Ionescu · Psychotherapist · Last session: March 14 · Next: March 21
+              {primaryConcerns.length > 0 ? primaryConcerns.join(" · ") : "No concerns set"}
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
