@@ -135,7 +135,7 @@ export default function Onboarding() {
     setData((prev) => ({ ...prev, [key]: prev[key].includes(item) ? prev[key].filter((x) => x !== item) : [...prev[key], item] }));
 
   const canAdvance = () => {
-    if (step === 1) return data.dob !== "" && data.height !== "" && data.weight !== "";
+    if (step === 1) return data.dob.length === 10 && data.height !== "" && data.weight !== "";
     if (step === 2) return data.foodConcerns.length > 0;
     if (step === 7) return data.safetyAgreed;
     return true;
@@ -146,7 +146,9 @@ export default function Onboarding() {
     try {
       if (s === 1) {
         await supabase.from("client_profiles").update({
-          date_of_birth: data.dob || null,
+          date_of_birth: data.dob.length === 10
+            ? `${data.dob.slice(6)}-${data.dob.slice(3, 5)}-${data.dob.slice(0, 2)}`
+            : null,
           height_cm: toCm(data.height, data.heightUnit),
           weight_kg: toKg(data.weight, data.weightUnit),
           menstrual_cycle_tracking: data.cycleTracking,
@@ -252,7 +254,20 @@ function Step1({ data, update }: { data: OnboardingData; update: <K extends keyo
       <div className="space-y-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">Date of birth</label>
-          <input type="date" value={data.dob} onChange={(e) => update("dob", e.target.value)} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
+          <input
+            type="text"
+            value={data.dob}
+            onChange={(e) => {
+              let v = e.target.value.replace(/[^\d/]/g, "");
+              if (v.length === 2 && data.dob.length === 1) v += "/";
+              if (v.length === 5 && data.dob.length === 4) v += "/";
+              if (v.length <= 10) update("dob", v);
+            }}
+            placeholder="DD/MM/YYYY"
+            maxLength={10}
+            className="w-full px-4 py-3 rounded-2xl border text-sm bg-card font-mono focus:outline-none"
+            style={{ borderColor: "hsl(var(--border))" }}
+          />
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between"><label className="text-sm font-medium">Height</label><UnitToggle value={data.heightUnit} options={["cm", "ft"]} onChange={(v) => update("heightUnit", v as HeightUnit)} /></div>
