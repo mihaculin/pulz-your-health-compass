@@ -277,18 +277,6 @@ function Step1({ data, update }: { data: OnboardingData; update: <K extends keyo
           <div className="flex items-center justify-between"><label className="text-sm font-medium">Weight</label><UnitToggle value={data.weightUnit} options={["kg", "lbs"]} onChange={(v) => update("weightUnit", v as WeightUnit)} /></div>
           <input type="number" value={data.weight} onChange={(e) => update("weight", e.target.value)} placeholder={data.weightUnit === "kg" ? "e.g. 62" : "e.g. 137"} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Cycle tracking</label>
-          <p className="text-xs text-muted-foreground">Would you like PULZ to factor in your menstrual cycle?</p>
-          <div className="flex gap-3">
-            {[{ label: "Yes, please", value: true }, { label: "No thanks", value: false }].map(({ label, value }) => (
-              <button key={label} type="button" onClick={() => update("cycleTracking", value)} className="flex-1 py-3 rounded-2xl text-sm font-medium border-2 transition-all"
-                style={data.cycleTracking === value ? { backgroundColor: "#b3ecec", borderColor: "#b3ecec", color: "#1A4040" } : { backgroundColor: "transparent", borderColor: "hsl(var(--border))" }}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
