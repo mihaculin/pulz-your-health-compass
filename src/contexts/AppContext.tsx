@@ -194,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setJoinedAt(profileRes.data.created_at);
       }
 
-      const localOnboardingDone = localStorage.getItem("pulz_onboarding_completed") === "true";
+      const localOnboardingDone = localStorage.getItem(`pulz_onboarding_${user.id}`) === "true";
 
       const dbCompleted = cpRes.data?.intake_survey_completed ?? false;
       const completed = dbCompleted || localOnboardingDone;
@@ -227,7 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // ── Write fresh data to localStorage cache ─────────────────────────
       const nextName = profileRes.data?.full_name ?? fullName;
       const nextJoinedAt = profileRes.data?.created_at ?? joinedAt;
-      const localOnboardingDone2 = localStorage.getItem("pulz_onboarding_completed") === "true";
+      const localOnboardingDone2 = localStorage.getItem(`pulz_onboarding_${user.id}`) === "true";
       const nextCompleted = (cpRes.data?.intake_survey_completed ?? false) || localOnboardingDone2;
       const nextHasDevice = !!deviceRes.data;
       const nextDob = cpRes.data?.date_of_birth ?? null;
@@ -304,8 +304,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const markIntakeSurveyCompleted = async () => {
     setIntakeSurveyCompleted(true);
-    localStorage.setItem("pulz_onboarding_completed", "true");
     if (!user) return;
+    localStorage.setItem(`pulz_onboarding_${user.id}`, "true");
     await supabase
       .from("client_profiles")
       .update({ intake_survey_completed: true, onboarding_completed: true })

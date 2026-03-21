@@ -31,6 +31,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) return <Navigate to="/" replace />;
 
+  console.log("[ProtectedRoute] intakeSurveyCompleted:", intakeSurveyCompleted, "path:", location.pathname);
+
   const atOnboarding = location.pathname === "/onboarding";
 
   if (atOnboarding && intakeSurveyCompleted) {

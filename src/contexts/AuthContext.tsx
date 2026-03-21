@@ -92,11 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     if (user) {
       localStorage.removeItem(`pulz_profile_v1_${user.id}`);
+      localStorage.removeItem(`pulz_onboarding_${user.id}`);
     }
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-    localStorage.removeItem("pulz_onboarding_completed");
     localStorage.removeItem("pulz_pending_confirmation");
     localStorage.removeItem("pulz_pending_email");
   };
