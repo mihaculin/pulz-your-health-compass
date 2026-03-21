@@ -48,6 +48,7 @@ interface AppContextType {
   joinedWeeksAgo: number;
   intakeSurveyCompleted: boolean;
   appLoading: boolean;
+  hasDevice: boolean;
   personalisation: PersonalisationSettings;
   dateOfBirth: string | null;
   primaryConcerns: string[];
@@ -103,6 +104,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [personalisation, setPersonalisation] = useState<PersonalisationSettings>(DEFAULT_PERSONALISATION);
   const [psId, setPsId] = useState<string | null>(null);
   const [riskLevel, setRiskLevel] = useState<"Calm" | "Elevated" | "Trigger Risk">("Calm");
+  const [hasDevice, setHasDevice] = useState(false);
   const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
   const [primaryConcerns, setPrimaryConcerns] = useState<string[]>([]);
   const prevUserId = useRef<string | null>(null);
@@ -115,6 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIntakeSurveyCompleted(false);
       setPersonalisation(DEFAULT_PERSONALISATION);
       setPsId(null);
+      setHasDevice(false);
       setDateOfBirth(null);
       setPrimaryConcerns([]);
       return;
@@ -126,7 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const load = async () => {
       setAppLoading(true);
 
-      const [profileRes, psRes, cpRes] = await Promise.all([
+      const [profileRes, psRes, cpRes, deviceRes] = await Promise.all([
         supabase.from("profiles").select("full_name, created_at").eq("user_id", user.id).maybeSingle(),
         supabase.from("personalisation_settings").select("*").eq("user_id", user.id).maybeSingle(),
         role === "client"
@@ -136,7 +139,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
               .eq("id", user.id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
+        supabase.from("device_connections").select("id").eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle(),
       ]);
+      setHasDevice(!!deviceRes.data);
 
       if (profileRes.data) {
         setFullName(profileRes.data.full_name ?? "");
@@ -229,6 +234,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         joinedWeeksAgo,
         intakeSurveyCompleted,
         appLoading,
+        hasDevice,
         personalisation,
         dateOfBirth,
         primaryConcerns,

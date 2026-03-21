@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Bell, Heart, Thermometer, Activity, Flame, BarChart3, Clock, AlertTriangle, Watch, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, Heart, Thermometer, Activity, Flame, BarChart3, Clock, AlertTriangle, Watch, X, BookOpen, PenLine } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
 import { SmartWatchPanel } from "@/components/dashboard/SmartWatchPanel";
 import { InterventionCard } from "@/components/dashboard/InterventionCard";
@@ -42,7 +43,8 @@ type RiskRow = Tables<"risk_windows">;
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { fullName, riskLevel, setRiskLevel } = useApp();
+  const { fullName, riskLevel, setRiskLevel, hasDevice } = useApp();
+  const navigate = useNavigate();
   const [watchOpen, setWatchOpen] = useState(false);
   const [interventionOpen, setInterventionOpen] = useState(false);
   const [biometrics, setBiometrics] = useState<BiometricState>({ hr: null, stress: null, temp: null, activity: null });
@@ -135,43 +137,81 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className={`bg-gradient-to-br ${style.gradient} bg-card rounded-xl p-6 card-physiological slide-up`} style={{ animationDelay: "60ms" }}>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-destructive/10"><Heart size={19} className="text-destructive" /></div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Heart Rate</p>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xl font-mono font-medium tabular-nums">{hr}</span>
-                    <span className="chip-biometric px-1.5 py-0.5 rounded text-[10px] font-medium">BPM</span>
-                    <span className="w-2 h-2 rounded-full bg-destructive pulse-dot" />
+          {hasDevice ? (
+            <div className={`bg-gradient-to-br ${style.gradient} bg-card rounded-xl p-6 card-physiological slide-up`} style={{ animationDelay: "60ms" }}>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-destructive/10"><Heart size={19} className="text-destructive" /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Heart Rate</p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xl font-mono font-medium tabular-nums">{hr}</span>
+                      <span className="chip-biometric px-1.5 py-0.5 rounded text-[10px] font-medium">BPM</span>
+                      <span className="w-2 h-2 rounded-full bg-destructive pulse-dot" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-warning/10"><AlertTriangle size={19} className="text-warning" /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Stress</p>
+                    <span className="text-xl font-mono font-medium tabular-nums">{stress}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg" style={{ backgroundColor: "hsla(180, 52%, 81%, 0.15)" }}><Thermometer size={19} style={{ color: "#1A4040" }} /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Temperature</p>
+                    <span className="text-xl font-mono font-medium tabular-nums">{temp}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-primary/10"><Activity size={19} className="text-primary" /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Movement</p>
+                    <span className="text-xl font-mono font-medium tabular-nums capitalize">{activityLabel}</span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-warning/10"><AlertTriangle size={19} className="text-warning" /></div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Stress</p>
-                  <span className="text-xl font-mono font-medium tabular-nums">{stress}</span>
+              <p className="mt-5 text-sm text-muted-foreground italic">{style.message}</p>
+            </div>
+          ) : (
+            <div className="space-y-3 slide-up" style={{ animationDelay: "60ms" }}>
+              <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec" }}>
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-lg" style={{ backgroundColor: "rgba(45,125,111,0.1)" }}>
+                    <BookOpen size={20} style={{ color: "#2D7D6F" }} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "#1A4040" }}>Manual Tracking Mode</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#2D7D6F" }}>You're tracking manually. Log episodes anytime using the Journal.</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => navigate("/journal")}
+                  className="shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-90 active:scale-[0.98]"
+                  style={{ backgroundColor: "#2D7D6F", color: "#fff" }}
+                >
+                  Log episode
+                </button>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg" style={{ backgroundColor: "hsla(180, 52%, 81%, 0.15)" }}><Thermometer size={19} style={{ color: "#1A4040" }} /></div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Temperature</p>
-                  <span className="text-xl font-mono font-medium tabular-nums">{temp}</span>
+
+              <div
+                className="rounded-xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow"
+                style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec" }}
+                onClick={() => navigate("/journal")}
+              >
+                <div className="p-3 rounded-xl" style={{ backgroundColor: "rgba(45,125,111,0.1)" }}>
+                  <PenLine size={22} style={{ color: "#2D7D6F" }} />
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-primary/10"><Activity size={19} className="text-primary" /></div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Movement</p>
-                  <span className="text-xl font-mono font-medium tabular-nums capitalize">{activityLabel}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold" style={{ color: "#1A4040" }}>Log a moment</p>
+                  <p className="text-xs mt-0.5 text-muted-foreground">Record what's happening right now — emotions, triggers, intensity.</p>
                 </div>
+                <span className="text-xs font-medium px-3 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: "#2D7D6F", color: "#fff" }}>Open Journal</span>
               </div>
             </div>
-            <p className="mt-5 text-sm text-muted-foreground italic">{style.message}</p>
-          </div>
+          )}
 
           <div className="bg-card rounded-xl p-6 card-physiological slide-up" style={{ animationDelay: "120ms" }}>
             <h2 className="text-lg font-heading font-semibold mb-4">Daily Timeline</h2>
