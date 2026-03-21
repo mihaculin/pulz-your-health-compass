@@ -37,44 +37,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          localStorage.removeItem("pulz_pending_confirmation");
-          localStorage.removeItem("pulz_pending_email");
-          // Use setTimeout to avoid Supabase deadlock
-          setTimeout(() => fetchRole(session.user.id), 0);
-        } else {
-          setRole(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    // THEN check existing session (with refresh fallback)
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      let nextSession = session ?? null;
-
-      if (!nextSession) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        nextSession = refreshData.session ?? null;
-      }
-
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      if (nextSession?.user) {
+    // Restore session from localStorage on startup
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
         localStorage.removeItem("pulz_pending_confirmation");
         localStorage.removeItem("pulz_pending_email");
-        fetchRole(nextSession.user.id);
+        fetchRole(session.user.id);
       }
       setLoading(false);
-    };
+    });
 
-    init();
+    // Listen for subsequent auth changes (sign in, sign out, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        localStorage.removeItem("pulz_pending_confirmation");
+        localStorage.removeItem("pulz_pending_email");
+        fetchRole(session.user.id);
+      } else {
+        setRole(null);
+      }
+      setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -140,6 +127,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (user) {
+      localStorage.removeItem(`pulz_profile_v1_${user.id}`);
+    }
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
