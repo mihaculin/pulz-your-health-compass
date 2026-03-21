@@ -1,18 +1,19 @@
 import { useState, useRef, useEffect } from "react";
-import { Check, Watch, Bell, Layout, Volume2, ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { THEMES } from "@/lib/theme";
+import { playAlert } from "@/lib/playAlert";
 
 const themes = THEMES.map((t) => ({ ...t, from: t.aqua, to: t.lavender }));
 
 const emojis = ["🌿", "🌊", "💜", "💚", "☁️", "🌙", "✨", "🫧", "🌸", "🍃", "🕊️", "🌷"];
 
-const vibrationPatterns = [
-  { id: "gentle", nameKey: "personalise.vibGentleName", subKey: "personalise.vibGentleSub", dots: 2, speed: "slow" },
-  { id: "steady", nameKey: "personalise.vibSteadyName", subKey: "personalise.vibSteadySub", dots: 1, speed: "medium" },
-  { id: "urgent", nameKey: "personalise.vibUrgentName", subKey: "personalise.vibUrgentSub", dots: 3, speed: "fast" },
+const soundTypes = [
+  { id: "chime", label: "Soft chime", hz: "440hz" },
+  { id: "bell", label: "Gentle bell", hz: "528hz" },
+  { id: "nature", label: "Nature sound", hz: "396hz" },
 ];
 
 const tones = [
@@ -21,18 +22,15 @@ const tones = [
   { id: "curious", nameKey: "personalise.toneCurious", preview: "Interesting moment. What's happening inside? 🌿" },
 ];
 
-function PulsingDots({ count, speed }: { count: number; speed: string }) {
-  const dur = speed === "slow" ? "1.8s" : speed === "medium" ? "1.2s" : "0.6s";
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
-    <div className="flex items-center gap-1.5 mt-2">
-      {Array.from({ length: count }).map((_, i) => (
-        <span
-          key={i}
-          className="w-3 h-3 rounded-full bg-primary inline-block"
-          style={{ animation: `pulseDot ${dur} ease-in-out infinite`, animationDelay: `${i * 150}ms` }}
-        />
-      ))}
-    </div>
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${on ? "bg-primary" : "bg-muted"}`}
+    >
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${on ? "translate-x-5" : ""}`} />
+    </button>
   );
 }
 
@@ -78,12 +76,31 @@ export default function Personalise() {
   const [selectedTheme, setSelectedTheme] = useState(personalisation.theme);
   const [customAccent, setCustomAccent] = useState(personalisation.accentColor);
 
+  const [messages, setMessages] = useState(defaultMessages.map((m) => m.text));
+  const [emojiOpen, setEmojiOpen] = useState<number | null>(null);
+  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const [soundOn, setSoundOn] = useState(false);
+  const [soundType, setSoundType] = useState("chime");
+  const [soundVolume, setSoundVolume] = useState(50);
+
+  const [browserNotifsEnabled, setBrowserNotifsEnabled] = useState(false);
+  const [notifDuration, setNotifDuration] = useState<3 | 5 | 10>(5);
+  const notifPosition = "bottom-right" as const;
+  const [inAppAlerts, setInAppAlerts] = useState(true);
+
+  const [selectedTone, setSelectedTone] = useState("warm");
+  const [languagePref, setLanguagePref] = useState("English");
+  const [crisisName, setCrisisName] = useState("");
+  const [crisisPhone, setCrisisPhone] = useState("");
+  const [crisisPrompt, setCrisisPrompt] = useState(false);
+  const [selfCare, setSelfCare] = useState("");
+
   useEffect(() => {
     setSelectedTheme(personalisation.theme);
     setCustomAccent(personalisation.accentColor);
     setMessages([personalisation.message1, personalisation.message2, personalisation.message3]);
-    setVibPattern(personalisation.vibrationPattern);
-    setVibIntensity(personalisation.vibrationIntensity);
     setSoundOn(personalisation.soundEnabled);
     setSoundType(personalisation.soundType);
     setSoundVolume(personalisation.soundVolume);
@@ -91,6 +108,10 @@ export default function Personalise() {
     setLanguagePref(personalisation.language);
     setCrisisName(personalisation.crisisContactName);
     setCrisisPhone(personalisation.crisisContactPhone);
+    setBrowserNotifsEnabled(personalisation.browserNotificationsEnabled);
+    setNotifDuration(personalisation.notificationDuration);
+
+    setInAppAlerts(personalisation.inAppAlertsEnabled);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -105,11 +126,6 @@ export default function Personalise() {
     setSelectedTheme("");
     updatePersonalisation({ theme: "", accentColor: hex });
   };
-
-  const [messages, setMessages] = useState(defaultMessages.map((m) => m.text));
-  const [emojiOpen, setEmojiOpen] = useState<number | null>(null);
-  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const updateMessage = (idx: number, val: string) => {
     if (val.length > 100) return;
@@ -133,39 +149,35 @@ export default function Personalise() {
     updatePersonalisation({ message1: defaults[0], message2: defaults[1], message3: defaults[2] });
   };
 
-  const [vibPattern, setVibPattern] = useState("gentle");
-  const [vibIntensity, setVibIntensity] = useState(3);
-  const [soundOn, setSoundOn] = useState(false);
-  const [soundType, setSoundType] = useState("Soft chime");
-  const [soundVolume, setSoundVolume] = useState(50);
-  const [channels, setChannels] = useState({ watch: true, phone: true, inApp: true, phoneSound: false });
 
-  const previewSound = () => {
-    try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 440;
-      gain.gain.value = 0.1;
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
-    } catch { /* silent */ }
+  const handleBrowserNotifToggle = async () => {
+    if (!browserNotifsEnabled) {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        setBrowserNotifsEnabled(true);
+        updatePersonalisation({ browserNotificationsEnabled: true });
+        toast({ description: "Browser notifications enabled ✅", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+      } else {
+        toast({ description: "Enable notifications in your browser settings", className: "bg-white border-l-2 border-l-[#FCD34D]" });
+      }
+    } else {
+      setBrowserNotifsEnabled(false);
+      updatePersonalisation({ browserNotificationsEnabled: false });
+    }
   };
 
-  const [selectedTone, setSelectedTone] = useState("warm");
-  const [languagePref, setLanguagePref] = useState("English");
-
-  const [crisisName, setCrisisName] = useState("");
-  const [crisisPhone, setCrisisPhone] = useState("");
-  const [crisisPrompt, setCrisisPrompt] = useState(false);
-  const [selfCare, setSelfCare] = useState("");
+  const testNotification = () => {
+    if (Notification.permission === "granted") {
+      if (soundOn) playAlert(soundType, soundVolume);
+      new Notification("PULZ", {
+        body: personalisation.message1 || "Take a slow breath. You're safe right now.",
+        icon: "/favicon.ico",
+      });
+    }
+  };
 
   const handleSave = async () => {
     await updatePersonalisation({
-      vibrationPattern: vibPattern,
-      vibrationIntensity: vibIntensity,
       soundEnabled: soundOn,
       soundType,
       soundVolume,
@@ -173,18 +185,15 @@ export default function Personalise() {
       language: languagePref,
       crisisContactName: crisisName,
       crisisContactPhone: crisisPhone,
+      browserNotificationsEnabled: browserNotifsEnabled,
+      notificationDuration: notifDuration,
+      notificationPosition: notifPosition,
+      inAppAlertsEnabled: inAppAlerts,
     });
     toast({ description: t("personalise.savedToast"), className: "bg-white border-l-2 border-l-[#b3ecec]" });
   };
 
   const inputCls = "w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:border-[#b3ecec] focus:ring-2 focus:ring-[#b3ecec]/30 transition bg-white";
-
-  const channelItems = [
-    { key: "watch" as const, icon: Watch, labelKey: "personalise.watchVibration" },
-    { key: "phone" as const, icon: Bell, labelKey: "personalise.phoneBanner" },
-    { key: "inApp" as const, icon: Layout, labelKey: "personalise.inApp" },
-    { key: "phoneSound" as const, icon: Volume2, labelKey: "personalise.phoneSound" },
-  ];
 
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-8 pb-16">
@@ -263,89 +272,106 @@ export default function Personalise() {
         </button>
       </section>
 
-      {/* SECTION C: SIGNAL SETTINGS */}
-      <section className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-6 slide-up" style={{ animationDelay: "180ms" }}>
-        <div>
-          <h2 className="font-heading font-semibold text-base">{t("personalise.reachTitle")}</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">{t("personalise.reachDesc")}</p>
+      {/* SECTION C-1: WEB EXPERIENCE */}
+      <section className="bg-card rounded-xl p-6 card-shadow border space-y-6 slide-up" style={{ borderColor: "#b3ecec", animationDelay: "180ms" }}>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🌐</span>
+          <h2 className="font-heading font-semibold text-base" style={{ color: "#2D7D6F" }}>Web experience</h2>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("personalise.vibrationPattern")}</label>
-          <div className="grid grid-cols-3 gap-3">
-            {vibrationPatterns.map((vp) => {
-              const active = vibPattern === vp.id;
-              return (
-                <button key={vp.id} onClick={() => setVibPattern(vp.id)}
-                  className={`rounded-xl p-4 text-left transition-all duration-200 active:scale-[0.97] border ${active ? "border-primary" : "border-border/60 hover:border-border"}`}
-                  style={active ? { backgroundColor: "#b3ecec" } : undefined}>
-                  <p className="text-sm font-medium">{t(vp.nameKey)}</p>
-                  <p className="text-xs text-muted-foreground">{t(vp.subKey)}</p>
-                  <PulsingDots count={vp.dots} speed={vp.speed} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("personalise.vibrationIntensity")}</label>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{t("personalise.barelyThere")}</span>
-            <input type="range" min={1} max={5} value={vibIntensity} onChange={(e) => setVibIntensity(Number(e.target.value))} className="flex-1" style={{ accentColor: "#2D7D6F" }} />
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{t("personalise.strong")}</span>
-          </div>
-          <div className="flex justify-center">
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary font-mono tabular-nums">{vibIntensity}</span>
-          </div>
-        </div>
-
+        {/* 1. SOUND */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">{t("personalise.sound")}</label>
-            <button type="button" onClick={() => setSoundOn(!soundOn)} className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${soundOn ? "bg-primary" : "bg-muted"}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${soundOn ? "translate-x-5" : ""}`} />
-            </button>
+            <div>
+              <p className="text-sm font-medium">Sound</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Play a tone when an alert fires</p>
+            </div>
+            <Toggle on={soundOn} onToggle={() => setSoundOn(!soundOn)} />
           </div>
           {soundOn && (
             <div className="space-y-4 pl-1">
-              <div className="flex flex-wrap gap-2">
-                {["Soft chime", "Gentle bell", "Nature sounds"].map((st) => (
-                  <button key={st} onClick={() => setSoundType(st)} className={`px-3 py-1.5 rounded-full text-sm transition-all active:scale-95 ${soundType === st ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground"}`}>
-                    {st}
+              <div className="grid grid-cols-3 gap-2">
+                {soundTypes.map((st) => (
+                  <button
+                    key={st.id}
+                    onClick={() => setSoundType(st.id)}
+                    className={`rounded-xl p-3 text-left transition-all duration-200 active:scale-[0.97] border ${soundType === st.id ? "border-primary" : "border-border/60 hover:border-border"}`}
+                    style={soundType === st.id ? { backgroundColor: "#b3ecec" } : undefined}
+                  >
+                    <p className="text-sm font-medium">{st.label}</p>
+                    <p className="text-xs text-muted-foreground">{st.hz}</p>
                   </button>
                 ))}
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">{t("personalise.volume")}</label>
-                <input type="range" min={0} max={100} value={soundVolume} onChange={(e) => setSoundVolume(Number(e.target.value))} className="w-full" style={{ accentColor: "#7B5E8A" }} />
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-muted-foreground">Volume</label>
+                  <span className="text-xs font-mono text-muted-foreground">{soundVolume}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={soundVolume}
+                  onChange={(e) => setSoundVolume(Number(e.target.value))}
+                  className="w-full"
+                  style={{ accentColor: "#7B5E8A" }}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>0%</span>
+                  <span>100%</span>
+                </div>
               </div>
-              <button type="button" onClick={previewSound} className="text-sm text-muted-foreground hover:text-foreground transition-colors active:scale-95">
-                {t("personalise.previewSound")}
+              <button
+                type="button"
+                onClick={() => playAlert(soundType, soundVolume)}
+                className="px-4 py-2 rounded-xl text-sm font-medium border border-border hover:bg-muted transition-colors active:scale-95"
+              >
+                Preview sound
               </button>
             </div>
           )}
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("personalise.channels")}</label>
-          {channelItems.map((ch) => (
-            <div key={ch.key} className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <ch.icon size={18} className="text-muted-foreground" />
-                <span className="text-sm">{t(ch.labelKey)}</span>
+        <div className="border-t border-border/30" />
+
+        {/* 2. BROWSER PUSH NOTIFICATION */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Pop-up notification</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Browser push notification</p>
+            </div>
+            <Toggle on={browserNotifsEnabled} onToggle={handleBrowserNotifToggle} />
+          </div>
+          {browserNotifsEnabled && (
+            <div className="space-y-4 pl-1">
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Show duration</label>
+                <div className="flex gap-1.5">
+                  {([3, 5, 10] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setNotifDuration(d)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 ${notifDuration === d ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground"}`}
+                    >
+                      {d}s
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button type="button" onClick={() => setChannels((prev) => ({ ...prev, [ch.key]: !prev[ch.key] }))} className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${channels[ch.key] ? "bg-primary" : "bg-muted"}`}>
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${channels[ch.key] ? "translate-x-5" : ""}`} />
+
+              <button
+                type="button"
+                onClick={testNotification}
+                className="px-4 py-2 rounded-xl text-sm font-medium border border-border hover:bg-muted transition-colors active:scale-95"
+              >
+                Test notification
               </button>
             </div>
-          ))}
+          )}
         </div>
 
-        <div className="rounded-xl p-4 space-y-1" style={{ backgroundColor: "hsl(var(--color-lavender-mist))", borderLeft: "3px solid hsl(var(--color-lavender))" }}>
-          <p className="text-sm font-medium">{t("personalise.notificationsOn")}</p>
-          <p className="text-sm text-muted-foreground leading-relaxed">{t("personalise.quietHoursInfo")}</p>
-        </div>
       </section>
 
       {/* SECTION D: MESSAGE TONE */}
@@ -397,9 +423,7 @@ export default function Personalise() {
 
         <label className="flex items-center justify-between py-1 cursor-pointer">
           <span className="text-sm">{t("personalise.crisisPromptLabel")}</span>
-          <button type="button" onClick={() => setCrisisPrompt(!crisisPrompt)} className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${crisisPrompt ? "bg-primary" : "bg-muted"}`}>
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${crisisPrompt ? "translate-x-5" : ""}`} />
-          </button>
+          <Toggle on={crisisPrompt} onToggle={() => setCrisisPrompt(!crisisPrompt)} />
         </label>
 
         <div className="rounded-2xl p-5 border" style={{ backgroundColor: "hsl(276 33% 95%)", borderColor: "#D7C9DB" }}>
