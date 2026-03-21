@@ -19,6 +19,10 @@ export interface PersonalisationSettings {
   soundType: string;
   soundVolume: number;
   language: string;
+  browserNotificationsEnabled: boolean;
+  notificationDuration: 3 | 5 | 10;
+  notificationPosition: "top-right" | "bottom-right" | "top-center";
+  inAppAlertsEnabled: boolean;
 }
 
 const DEFAULT_PERSONALISATION: PersonalisationSettings = {
@@ -33,9 +37,13 @@ const DEFAULT_PERSONALISATION: PersonalisationSettings = {
   vibrationPattern: "gentle",
   vibrationIntensity: 3,
   soundEnabled: false,
-  soundType: "Soft chime",
+  soundType: "chime",
   soundVolume: 50,
   language: "English",
+  browserNotificationsEnabled: false,
+  notificationDuration: 5 as 3 | 5 | 10,
+  notificationPosition: "bottom-right" as "top-right" | "bottom-right" | "top-center",
+  inAppAlertsEnabled: true,
 };
 
 interface AppContextType {
@@ -75,9 +83,13 @@ function rowToPersonalisation(row: Tables<"personalisation_settings">): Personal
     vibrationPattern: row.vibration_pattern ?? "gentle",
     vibrationIntensity: row.vibration_intensity ?? 3,
     soundEnabled: row.sound_enabled ?? false,
-    soundType: row.sound_type ?? "Soft chime",
+    soundType: row.sound_type ?? "chime",
     soundVolume: row.sound_volume ?? 50,
     language: row.language ?? "English",
+    browserNotificationsEnabled: false,
+    notificationDuration: 5 as 3 | 5 | 10,
+    notificationPosition: "bottom-right" as "top-right" | "bottom-right" | "top-center",
+    inAppAlertsEnabled: true,
   };
 }
 
@@ -220,9 +232,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         nextPs = rowToPersonalisation(psRes.data);
         nextPsId = psRes.data.id;
         setPsId(nextPsId);
-        setPersonalisation(nextPs);
         applyThemeById(nextPs.theme, nextPs.accentColor);
       }
+
+      const webNotif = (() => {
+        try { return JSON.parse(localStorage.getItem(WEB_NOTIF_KEY(user.id)) ?? "null"); }
+        catch { return null; }
+      })();
+      if (webNotif) {
+        nextPs = { ...nextPs, ...webNotif };
+      }
+      setPersonalisation(nextPs);
 
       // ── Write fresh data to localStorage cache ─────────────────────────
       const nextName = profileRes.data?.full_name ?? fullName;
@@ -261,6 +281,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     load();
   }, [user, refreshTick]);
 
+  const WEB_NOTIF_KEY = (uid: string) => `pulz_web_notif_${uid}`;
+
   const updatePersonalisation = async (patch: Partial<PersonalisationSettings>) => {
     const next = { ...personalisation, ...patch };
     setPersonalisation(next);
@@ -270,6 +292,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (!user) return;
+
+    if (
+      "browserNotificationsEnabled" in patch ||
+      "notificationDuration" in patch ||
+      "notificationPosition" in patch ||
+      "inAppAlertsEnabled" in patch
+    ) {
+      localStorage.setItem(
+        WEB_NOTIF_KEY(user.id),
+        JSON.stringify({
+          browserNotificationsEnabled: next.browserNotificationsEnabled,
+          notificationDuration: next.notificationDuration,
+          notificationPosition: next.notificationPosition,
+          inAppAlertsEnabled: next.inAppAlertsEnabled,
+        })
+      );
+    }
 
     const payload = {
       user_id: user.id,

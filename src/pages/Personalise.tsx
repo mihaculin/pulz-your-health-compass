@@ -90,6 +90,7 @@ export default function Personalise() {
   const notifPosition = "bottom-right" as const;
   const [inAppAlerts, setInAppAlerts] = useState(true);
 
+  const [savedOk, setSavedOk] = useState(false);
   const [selectedTone, setSelectedTone] = useState("warm");
   const [languagePref, setLanguagePref] = useState("English");
   const [crisisName, setCrisisName] = useState("");
@@ -190,6 +191,8 @@ export default function Personalise() {
       notificationPosition: notifPosition,
       inAppAlertsEnabled: inAppAlerts,
     });
+    setSavedOk(true);
+    setTimeout(() => setSavedOk(false), 2000);
     toast({ description: t("personalise.savedToast"), className: "bg-white border-l-2 border-l-[#b3ecec]" });
   };
 
@@ -424,9 +427,17 @@ export default function Personalise() {
         </div>
       </section>
 
-      <button type="button" onClick={handleSave} className="w-full py-3.5 rounded-2xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors active:scale-[0.98] shadow-sm slide-up" style={{ animationDelay: "360ms" }}>
-        {t("personalise.saveAll")}
-      </button>
+      <div className="flex items-center gap-3 slide-up" style={{ animationDelay: "360ms" }}>
+        <button type="button" onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors active:scale-[0.98] shadow-sm">
+          {t("personalise.saveAll")}
+        </button>
+        {savedOk && (
+          <span className="flex items-center gap-1 text-sm font-medium text-[#2D7D6F] animate-in fade-in duration-200">
+            <Check size={15} />
+            Saved
+          </span>
+        )}
+      </div>
     </div>
   );
 }
