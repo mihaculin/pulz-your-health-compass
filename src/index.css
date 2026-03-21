@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+:root {
     --background: 220 14% 97%;
     --foreground: 224 33% 14%;
 
@@ -60,18 +60,51 @@
   }
 }
 
+
 @layer base {
   * {
     @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply text-foreground font-body antialiased;
+    background: linear-gradient(90deg, var(--bg-a) 0%, var(--bg-b) 50%, var(--bg-a) 100%);
+    background-size: 200% 200%;
+    animation: gradient-glide 18s ease-in-out infinite;
+    transition: --bg-a 700ms ease, --bg-b 700ms ease;
+  }
+
+  body.theme-slide {
+    animation: gradient-slide 900ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+    animation-fill-mode: both;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading font-medium;
   }
+}
+
+@property --bg-a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: hsl(var(--color-aqua));
+}
+
+@property --bg-b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: hsl(var(--color-lavender));
+}
+
+@keyframes gradient-glide {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes gradient-slide {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 120% 50%; }
 }
 
 @layer utilities {

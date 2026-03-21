@@ -31,8 +31,22 @@ export function hexToHsl(hex: string): string {
 }
 
 export function applyThemeCss(aqua: string, lavender: string): void {
-  document.documentElement.style.setProperty("--color-aqua", hexToHsl(aqua));
-  document.documentElement.style.setProperty("--color-lavender", hexToHsl(lavender));
+  const aquaHsl = hexToHsl(aqua);
+  const lavenderHsl = hexToHsl(lavender);
+  document.documentElement.style.setProperty("--color-aqua", aquaHsl);
+  document.documentElement.style.setProperty("--color-lavender", lavenderHsl);
+  document.documentElement.style.setProperty("--background", aquaHsl);
+  document.documentElement.style.setProperty("--bg-a", `hsl(${aquaHsl})`);
+  document.documentElement.style.setProperty("--bg-b", `hsl(${lavenderHsl})`);
+
+  const body = document.body;
+  if (body) {
+    body.classList.remove("theme-slide");
+    // Force reflow to restart animation
+    void body.offsetWidth;
+    body.classList.add("theme-slide");
+    window.setTimeout(() => body.classList.remove("theme-slide"), 950);
+  }
 }
 
 export function applyThemeById(themeId: string, customAqua = "#b3ecec"): void {
