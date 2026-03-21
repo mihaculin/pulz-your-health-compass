@@ -1,8 +1,7 @@
-import { LayoutDashboard, BookOpen, TrendingUp, Stethoscope, Settings, SlidersHorizontal, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, TrendingUp, Stethoscope, Settings, SlidersHorizontal } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -28,14 +27,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const navigate = useNavigate();
   const { fullName, initials, joinedWeeksAgo } = useApp();
-  const { signOut } = useAuth();
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/", { replace: true });
-  };
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -91,16 +83,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-3">
-        <div style={{ borderTop: "1px solid #E8EAED" }} className="pt-2 mb-2">
-          <button
-            onClick={handleSignOut}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-[#F4EEF7] active:scale-[0.98] ${collapsed ? "justify-center" : ""}`}
-            style={{ color: "#7B5E8A" }}
-          >
-            <LogOut size={17} strokeWidth={1.8} />
-            {!collapsed && <span>Sign out</span>}
-          </button>
-        </div>
         <div className={`flex items-center gap-3 ${collapsed ? "justify-center" : ""}`}>
           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-heading font-semibold text-sm shrink-0">
             {initials || "?"}

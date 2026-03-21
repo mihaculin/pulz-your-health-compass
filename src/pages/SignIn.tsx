@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { SocialLoginButtons } from "@/components/SocialLoginButtons";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -74,8 +73,6 @@ export default function SignIn() {
         <h1 className="text-2xl font-heading font-semibold" style={{ color: "hsl(var(--primary))" }}>
           {resetMode ? "Reset password" : "Welcome back"}
         </h1>
-
-        {!resetMode && <SocialLoginButtons />}
 
         <form onSubmit={resetMode ? handleReset : handleSubmit} className="space-y-4">
           <div className="space-y-2">
