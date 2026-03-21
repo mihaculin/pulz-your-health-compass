@@ -102,8 +102,6 @@ export default function Personalise() {
     setSoundOn(personalisation.soundEnabled);
     setSoundType(personalisation.soundType);
     setSoundVolume(personalisation.soundVolume);
-    setQuietFrom(personalisation.quietHoursStart);
-    setQuietTo(personalisation.quietHoursEnd);
     setSelectedTone(personalisation.messageTone);
     setLanguage(personalisation.language);
     setCrisisName(personalisation.crisisContactName);
@@ -158,9 +156,6 @@ export default function Personalise() {
   const [soundType, setSoundType] = useState("Soft chime");
   const [soundVolume, setSoundVolume] = useState(50);
   const [channels, setChannels] = useState({ watch: true, phone: true, inApp: true, phoneSound: false });
-  const [quietFrom, setQuietFrom] = useState("22:00");
-  const [quietTo, setQuietTo] = useState("08:00");
-  const [quietExcept, setQuietExcept] = useState(true);
 
   const previewSound = () => {
     try {
@@ -193,8 +188,6 @@ export default function Personalise() {
       soundEnabled: soundOn,
       soundType,
       soundVolume,
-      quietHoursStart: quietFrom,
-      quietHoursEnd: quietTo,
       messageTone: selectedTone,
       language,
       crisisContactName: crisisName,
@@ -424,19 +417,12 @@ export default function Personalise() {
           ))}
         </div>
 
-        {/* Quiet hours */}
-        <div className="space-y-3">
-          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Quiet hours</label>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm text-muted-foreground">No alerts between</span>
-            <input type="time" value={quietFrom} onChange={(e) => setQuietFrom(e.target.value)} className="rounded-lg border border-border px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#b3ecec] focus:ring-2 focus:ring-[#b3ecec]/30 transition" />
-            <span className="text-sm text-muted-foreground">and</span>
-            <input type="time" value={quietTo} onChange={(e) => setQuietTo(e.target.value)} className="rounded-lg border border-border px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#b3ecec] focus:ring-2 focus:ring-[#b3ecec]/30 transition" />
-          </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={quietExcept} onChange={(e) => setQuietExcept(e.target.checked)} className="rounded border-border accent-primary w-4 h-4" />
-            Except for TRIGGER RISK level alerts
-          </label>
+        {/* Why quiet hours are not available */}
+        <div className="rounded-xl p-4 space-y-1" style={{ backgroundColor: "hsl(var(--color-lavender-mist))", borderLeft: "3px solid hsl(var(--color-lavender))" }}>
+          <p className="text-sm font-medium">PULZ notifications are always on</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Quiet hours are not available for clients. Nighttime eating episodes are clinically significant and silencing alerts overnight could mean missing a critical intervention moment. PULZ will always reach you when it detects an elevated risk pattern — day or night.
+          </p>
         </div>
       </section>
 
