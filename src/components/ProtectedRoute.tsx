@@ -1,16 +1,22 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
-import { Skeleton } from "@/components/ui/skeleton";
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="space-y-4 w-full max-w-md px-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-32 w-full rounded-xl" />
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "hsl(var(--background))" }}>
+      <span className="text-2xl font-heading font-semibold" style={{ color: "hsl(var(--primary))" }}>PULZ</span>
+      <div className="flex gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="w-2 h-2 rounded-full"
+            style={{
+              backgroundColor: "#b3ecec",
+              animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+            }}
+          />
+        ))}
       </div>
     </div>
   );

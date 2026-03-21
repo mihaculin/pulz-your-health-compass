@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, PenLine, Share2, UserCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,6 +58,7 @@ function parseContext(ctx: string | null): { episode_type?: string; occurred?: s
 
 export default function Journal() {
   const { user } = useAuth();
+  const { surveyTriggers } = useApp();
   const { toast } = useToast();
 
   const [occurred, setOccurred] = useState("");
@@ -66,6 +68,7 @@ export default function Journal() {
   const [whenTime, setWhenTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [intensity, setIntensity] = useState(5);
   const [triggers, setTriggers] = useState<string[]>([]);
+  const [triggersSeeded, setTriggersSeeded] = useState(false);
   const [otherTrigger, setOtherTrigger] = useState("");
   const [afterEmotions, setAfterEmotions] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -77,6 +80,13 @@ export default function Journal() {
 
   const toggleArr = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, val: string) =>
     setArr(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
+
+  useEffect(() => {
+    if (!triggersSeeded && surveyTriggers.length > 0) {
+      setTriggers(surveyTriggers.filter((t) => TRIGGER_OPTIONS.includes(t)));
+      setTriggersSeeded(true);
+    }
+  }, [surveyTriggers, triggersSeeded]);
 
   useEffect(() => {
     if (!user) return;

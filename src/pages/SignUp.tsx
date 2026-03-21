@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { LegalModal, TermsContent, PrivacyContent } from "@/components/LegalModal";
+import { SocialLoginButtons } from "@/components/SocialLoginButtons";
 
 type SelectedRole = "client" | "specialist" | null;
 
@@ -82,7 +83,8 @@ export default function SignUp() {
 
         {step === "role" && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">How will you use PULZ?</p>
+            <SocialLoginButtons />
+            <p className="text-sm text-muted-foreground">Or choose how you'll use PULZ:</p>
             <div className="grid grid-cols-2 gap-4">
               {[
                 { role: "client" as const, icon: User, title: "I'm here for myself", desc: "Track patterns & get support" },

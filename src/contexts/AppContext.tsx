@@ -52,6 +52,7 @@ interface AppContextType {
   weightKg: number | null;
   conditions: string[];
   specialistCode: string | null;
+  surveyTriggers: string[];
   riskLevel: "Calm" | "Elevated" | "Trigger Risk";
   updatePersonalisation: (patch: Partial<PersonalisationSettings>) => Promise<void>;
   markIntakeSurveyCompleted: () => Promise<void>;
@@ -111,16 +112,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [conditions, setConditions] = useState<string[]>([]);
   const [specialistCode, setSpecialistCode] = useState<string | null>(null);
-  const prevUserId = useRef<string | null>(null);
+  const [surveyTriggers, setSurveyTriggers] = useState<string[]>([]);
+  const lastFetchKey = useRef<string | null>(null);
 
   const refreshProfile = () => {
-    prevUserId.current = null;
+    lastFetchKey.current = null;
     setRefreshTick((t) => t + 1);
   };
 
   useEffect(() => {
     if (!user) {
-      prevUserId.current = null;
+      lastFetchKey.current = null;
       setAppLoading(false);
       setFullName("");
       setIntakeSurveyCompleted(false);
@@ -133,14 +135,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setWeightKg(null);
       setConditions([]);
       setSpecialistCode(null);
+      setSurveyTriggers([]);
       return;
     }
 
-    if (prevUserId.current === user.id) return;
-    prevUserId.current = user.id;
+    // Wait until role is resolved — prevents a partial fetch with role=null
+    if (role === null) return;
+
+    // Deduplicate: only re-fetch when user+role combination actually changes
+    const fetchKey = `${user.id}:${role}:${refreshTick}`;
+    if (lastFetchKey.current === fetchKey) return;
+    lastFetchKey.current = fetchKey;
+
+    // ── Instant hydration from localStorage cache ──────────────────────────
+    const CACHE_KEY = `pulz_profile_v1_${user.id}`;
+    const cached = (() => {
+      try { return JSON.parse(localStorage.getItem(CACHE_KEY) ?? "null"); }
+      catch { return null; }
+    })();
+    if (cached) {
+      setFullName(cached.fullName ?? "");
+      setJoinedAt(cached.joinedAt ?? new Date().toISOString());
+      setIntakeSurveyCompleted(cached.intakeSurveyCompleted ?? false);
+      setPersonalisation(cached.personalisation ?? DEFAULT_PERSONALISATION);
+      setPsId(cached.psId ?? null);
+      setHasDevice(cached.hasDevice ?? false);
+      setDateOfBirth(cached.dateOfBirth ?? null);
+      setPrimaryConcerns(cached.primaryConcerns ?? []);
+      setHeightCm(cached.heightCm ?? null);
+      setWeightKg(cached.weightKg ?? null);
+      setConditions(cached.conditions ?? []);
+      setSpecialistCode(cached.specialistCode ?? null);
+      setSurveyTriggers(cached.surveyTriggers ?? []);
+      if (cached.personalisation) {
+        applyThemeById(cached.personalisation.theme, cached.personalisation.accentColor);
+      }
+      setAppLoading(false); // instant — no flash
+    }
 
     const load = async () => {
-      setAppLoading(true);
+      if (!cached) setAppLoading(true);
 
       const [profileRes, psRes, cpRes, deviceRes] = await Promise.all([
         supabase.from("profiles").select("full_name, created_at").eq("user_id", user.id).maybeSingle(),
@@ -155,6 +189,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from("device_connections").select("id").eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle(),
       ]);
       setHasDevice(!!deviceRes.data);
+
+      console.log("[AppContext] client_profiles data:", cpRes.data);
+      console.log("[AppContext] client_profiles error:", cpRes.error);
+      console.log("[AppContext] personalisation_settings data:", psRes.data);
+      console.log("[AppContext] personalisation_settings error:", psRes.error);
 
       if (profileRes.data) {
         setFullName(profileRes.data.full_name ?? "");
@@ -171,6 +210,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setWeightKg(null);
         setConditions([]);
         setSpecialistCode(null);
+        setSurveyTriggers([]);
       } else {
         const dbCompleted = cpRes.data?.intake_survey_completed ?? false;
         const completed = dbCompleted || localOnboardingDone;
@@ -188,14 +228,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setConditions((cpRes.data as any)?.co_occurring_conditions ?? []);
         const isr = (cpRes.data as any)?.intake_survey_responses;
         setSpecialistCode(isr?.specialist_code ?? null);
+        setSurveyTriggers(isr?.triggers ?? []);
       }
 
+      let nextPs = personalisation;
+      let nextPsId = psId;
       if (psRes.data) {
-        const ps = rowToPersonalisation(psRes.data);
-        setPsId(psRes.data.id);
-        setPersonalisation(ps);
-        applyThemeById(ps.theme, ps.accentColor);
+        nextPs = rowToPersonalisation(psRes.data);
+        nextPsId = psRes.data.id;
+        setPsId(nextPsId);
+        setPersonalisation(nextPs);
+        applyThemeById(nextPs.theme, nextPs.accentColor);
       }
+
+      // ── Write fresh data to localStorage cache ─────────────────────────
+      const nextName = profileRes.data?.full_name ?? fullName;
+      const nextJoinedAt = profileRes.data?.created_at ?? joinedAt;
+      const localOnboardingDone2 = localStorage.getItem("pulz_onboarding_completed") === "true";
+      const nextCompleted = role === "specialist"
+        ? true
+        : ((cpRes.data?.intake_survey_completed ?? false) || localOnboardingDone2);
+      const nextHasDevice = !!deviceRes.data;
+      const nextDob = role === "specialist" ? null : (cpRes.data?.date_of_birth ?? null);
+      const nextConcerns = role === "specialist" ? [] : (cpRes.data?.primary_concerns ?? []);
+      const nextHeight = role === "specialist" ? null : ((cpRes.data as any)?.height_cm ?? null);
+      const nextWeight = role === "specialist" ? null : ((cpRes.data as any)?.weight_kg ?? null);
+      const nextConds = role === "specialist" ? [] : ((cpRes.data as any)?.co_occurring_conditions ?? []);
+      const nextIsr = role === "specialist" ? null : (cpRes.data as any)?.intake_survey_responses;
+      const nextCode = nextIsr?.specialist_code ?? null;
+      const nextTriggers = nextIsr?.triggers ?? [];
+
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        fullName: nextName,
+        joinedAt: nextJoinedAt,
+        intakeSurveyCompleted: nextCompleted,
+        personalisation: nextPs,
+        psId: nextPsId,
+        hasDevice: nextHasDevice,
+        dateOfBirth: nextDob,
+        primaryConcerns: nextConcerns,
+        heightCm: nextHeight,
+        weightKg: nextWeight,
+        conditions: nextConds,
+        specialistCode: nextCode,
+        surveyTriggers: nextTriggers,
+      }));
 
       setAppLoading(false);
     };
@@ -273,6 +350,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         weightKg,
         conditions,
         specialistCode,
+        surveyTriggers,
         riskLevel,
         updatePersonalisation,
         markIntakeSurveyCompleted,
