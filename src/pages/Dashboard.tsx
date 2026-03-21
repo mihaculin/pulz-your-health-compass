@@ -189,25 +189,6 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="space-y-3 slide-up" style={{ animationDelay: "60ms" }}>
-              <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec" }}>
-                <div className="flex items-center gap-4">
-                  <div className="p-2.5 rounded-lg" style={{ backgroundColor: "rgba(45,125,111,0.1)" }}>
-                    <BookOpen size={20} style={{ color: "#2D7D6F" }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: "#1A4040" }}>{t("dashboard.manualMode")}</p>
-                    <p className="text-xs mt-0.5" style={{ color: "#2D7D6F" }}>{t("dashboard.manualDesc")}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate("/journal")}
-                  className="shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-90 active:scale-[0.98]"
-                  style={{ backgroundColor: "#2D7D6F", color: "#fff" }}
-                >
-                  {t("dashboard.logEpisode")}
-                </button>
-              </div>
-
               <div
                 className="rounded-xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow"
                 style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec" }}
