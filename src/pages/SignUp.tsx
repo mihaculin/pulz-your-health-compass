@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { User, ClipboardList, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +20,13 @@ export default function SignUp() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  useEffect(() => {
+    const pending = localStorage.getItem("pulz_pending_confirmation");
+    if (pending === "true") {
+      navigate("/signin", { replace: true });
+    }
+  }, [navigate]);
+
   const handleRoleSelect = (role: SelectedRole) => {
     setSelectedRole(role);
     setStep("details");
@@ -30,11 +37,22 @@ export default function SignUp() {
     if (!selectedRole || !consent) return;
     setSubmitting(true);
 
-    const { error } = await signUp(email, password, fullName, selectedRole);
+    const { error, needsEmailConfirmation } = await signUp(email, password, fullName, selectedRole);
     setSubmitting(false);
 
     if (error) {
       toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    if (needsEmailConfirmation) {
+      localStorage.setItem("pulz_pending_confirmation", "true");
+      localStorage.setItem("pulz_pending_email", email);
+      toast({
+        title: "Check your email",
+        description: "Confirm your email to finish setup, then sign in.",
+      });
+      navigate("/signin");
       return;
     }
 

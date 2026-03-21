@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +16,18 @@ export default function SignIn() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  useEffect(() => {
+    const pending = localStorage.getItem("pulz_pending_confirmation");
+    const pendingEmail = localStorage.getItem("pulz_pending_email");
+    if (pending === "true" && pendingEmail) {
+      setEmail(pendingEmail);
+      toast({
+        title: "Email confirmation required",
+        description: "Confirm your email, then sign in.",
+      });
+    }
+  }, [toast]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -27,6 +39,9 @@ export default function SignIn() {
       toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
       return;
     }
+
+    localStorage.removeItem("pulz_pending_confirmation");
+    localStorage.removeItem("pulz_pending_email");
 
     // Role-based redirect handled by App.tsx
     navigate("/dashboard");

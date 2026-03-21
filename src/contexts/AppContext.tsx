@@ -148,12 +148,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setJoinedAt(profileRes.data.created_at);
       }
 
+      const localOnboardingDone = localStorage.getItem("pulz_onboarding_completed") === "true";
+
       if (role === "specialist") {
         setIntakeSurveyCompleted(true);
         setDateOfBirth(null);
         setPrimaryConcerns([]);
       } else {
-        setIntakeSurveyCompleted(cpRes.data?.intake_survey_completed ?? false);
+        const dbCompleted = cpRes.data?.intake_survey_completed ?? false;
+        const completed = dbCompleted || localOnboardingDone;
+        setIntakeSurveyCompleted(completed);
+        if (completed && !dbCompleted) {
+          await supabase
+            .from("client_profiles")
+            .update({ intake_survey_completed: true, onboarding_completed: true })
+            .eq("id", user.id);
+        }
         setDateOfBirth(cpRes.data?.date_of_birth ?? null);
         setPrimaryConcerns(cpRes.data?.primary_concerns ?? []);
       }
@@ -216,6 +226,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const markIntakeSurveyCompleted = async () => {
     setIntakeSurveyCompleted(true);
+    localStorage.setItem("pulz_onboarding_completed", "true");
     if (!user) return;
     await supabase
       .from("client_profiles")

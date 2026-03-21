@@ -9,7 +9,12 @@ interface AuthContextType {
   session: Session | null;
   role: AppRole;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, role: "client" | "specialist") => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    role: "client" | "specialist"
+  ) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -38,6 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          localStorage.removeItem("pulz_pending_confirmation");
+          localStorage.removeItem("pulz_pending_email");
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => fetchRole(session.user.id), 0);
         } else {
@@ -47,15 +54,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRole(session.user.id);
+    // THEN check existing session (with refresh fallback)
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      let nextSession = session ?? null;
+
+      if (!nextSession) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        nextSession = refreshData.session ?? null;
+      }
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      if (nextSession?.user) {
+        localStorage.removeItem("pulz_pending_confirmation");
+        localStorage.removeItem("pulz_pending_email");
+        fetchRole(nextSession.user.id);
       }
       setLoading(false);
-    });
+    };
+
+    init();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -92,6 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole(selectedRole);
     }
 
+    if (!data.session) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        const msg = signInError.message.toLowerCase();
+        if (msg.includes("email not confirmed") || msg.includes("confirm")) {
+          return { error: null, needsEmailConfirmation: true };
+        }
+        return { error: signInError as Error };
+      }
+    }
+
     return { error: null };
   };
 
@@ -105,6 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setRole(null);
+    localStorage.removeItem("pulz_onboarding_completed");
+    localStorage.removeItem("pulz_pending_confirmation");
+    localStorage.removeItem("pulz_pending_email");
   };
 
   return (
