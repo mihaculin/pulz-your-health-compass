@@ -19,6 +19,7 @@ import SettingsPage from "./pages/Settings";
 import Personalise from "./pages/Personalise";
 import Onboarding from "./pages/Onboarding";
 import SpecialistDashboard from "./pages/SpecialistDashboard";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,9 @@ function AppRoutes() {
       <Route path="/personalise" element={<ProtectedRoute><AppLayout><Personalise /></AppLayout></ProtectedRoute>} />
 
       <Route path="/specialist/dashboard" element={<ProtectedRoute><SpecialistDashboard /></ProtectedRoute>} />
+
+      {/* OAuth redirect handler — must be public (no ProtectedRoute wrapper) */}
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
