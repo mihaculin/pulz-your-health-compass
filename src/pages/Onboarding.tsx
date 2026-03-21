@@ -61,7 +61,7 @@ const DEVICES = [
   { id: "apple_watch", label: "Apple Watch", icon: Watch, color: "#1C1C1E" },
   { id: "garmin", label: "Garmin", icon: Activity, color: "#006E51" },
   { id: "fitbit", label: "Fitbit", icon: Heart, color: "#00B0B9" },
-  { id: "samsung", label: "Samsung Health", icon: Smartphone, color: "#1428A0" },
+  { id: "samsung", label: "Samsung Galaxy", icon: Smartphone, color: "#1428A0" },
 ];
 const TONE_PREVIEWS: Record<Tone, string> = {
   gentle: "Hey, I noticed your heart rate went up a little — that's okay. Let's take a breath together. 💚",
