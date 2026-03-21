@@ -389,9 +389,6 @@ function Step7({ data, update, t }: { data: OnboardingData; update: <K extends k
   return (
     <div className="space-y-6">
       <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step7Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step7Desc")}</p></div>
-      <div className="rounded-2xl p-4 text-sm" style={{ backgroundColor: "hsl(var(--color-lavender-mist))", borderLeft: "3px solid hsl(var(--color-lavender))" }}>
-        {t("onboarding.crisisInfo")}
-      </div>
       <div className="space-y-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">{t("onboarding.crisisContactName")} <span className="text-muted-foreground font-normal">{t("common.optional")}</span></label>

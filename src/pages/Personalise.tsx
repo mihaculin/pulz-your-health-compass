@@ -393,14 +393,6 @@ export default function Personalise() {
             );
           })}
         </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("personalise.interventionLanguage")}</label>
-          <select value={languagePref} onChange={(e) => setLanguagePref(e.target.value)} className="w-full rounded-xl border border-border px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#b3ecec] focus:ring-2 focus:ring-[#b3ecec]/30 transition">
-            {["Romanian", "English"].map((lang) => (
-              <option key={lang}>{lang}</option>
-            ))}
-          </select>
-        </div>
       </section>
 
       {/* SECTION E: CRISIS PREFERENCES */}
@@ -425,13 +417,6 @@ export default function Personalise() {
           <span className="text-sm">{t("personalise.crisisPromptLabel")}</span>
           <Toggle on={crisisPrompt} onToggle={() => setCrisisPrompt(!crisisPrompt)} />
         </label>
-
-        <div className="rounded-2xl p-5 border" style={{ backgroundColor: "hsl(276 33% 95%)", borderColor: "#D7C9DB" }}>
-          <p className="text-sm text-muted-foreground">{t("personalise.crisisNote")}</p>
-          <a href="#" className="text-sm font-medium mt-2 inline-flex items-center gap-1 hover:underline" style={{ color: "#2D7D6F" }}>
-            {t("personalise.findSpecialist")} <ChevronRight size={14} />
-          </a>
-        </div>
 
         <div>
           <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1 block">{t("personalise.selfCare")}</label>
