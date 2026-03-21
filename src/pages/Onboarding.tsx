@@ -125,7 +125,7 @@ export default function Onboarding() {
   const [data, setData] = useState<OnboardingData>(DEFAULT);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
-  const { updatePersonalisation, markIntakeSurveyCompleted } = useApp();
+  const { updatePersonalisation, markIntakeSurveyCompleted, refreshProfile } = useApp();
   const navigate = useNavigate();
 
   const update = <K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) =>
@@ -143,52 +143,64 @@ export default function Onboarding() {
 
   const saveStep = async (s: number) => {
     if (!user) return;
-    try {
-      if (s === 1) {
-        await supabase.from("client_profiles").update({
-          date_of_birth: data.dob.length === 10
-            ? `${data.dob.slice(6)}-${data.dob.slice(3, 5)}-${data.dob.slice(0, 2)}`
-            : null,
-          height_cm: toCm(data.height, data.heightUnit),
-          weight_kg: toKg(data.weight, data.weightUnit),
-          menstrual_cycle_tracking: data.cycleTracking,
-        }).eq("id", user.id);
-      }
-      if (s === 2) {
-        await supabase.from("client_profiles").update({ primary_concerns: data.foodConcerns }).eq("id", user.id);
-      }
-      if (s === 3) {
-        const existing = await supabase.from("client_profiles").select("intake_survey_responses").eq("id", user.id).maybeSingle();
-        const prev = (existing.data?.intake_survey_responses as Record<string, unknown>) ?? {};
-        await supabase.from("client_profiles").update({
-          intake_survey_responses: { ...prev, emotional_patterns: data.emotionSliders, triggers: data.triggers },
-        }).eq("id", user.id);
-      }
-      if (s === 4) {
-        const existing = await supabase.from("client_profiles").select("intake_survey_responses").eq("id", user.id).maybeSingle();
-        const prev = (existing.data?.intake_survey_responses as Record<string, unknown>) ?? {};
-        await supabase.from("client_profiles").update({
-          co_occurring_conditions: data.conditions,
-          intake_survey_responses: {
-            ...prev,
-            specialist_code: data.specialistCode,
-            other_condition: data.otherCondition || null,
-          },
-        }).eq("id", user.id);
-      }
-      if (s === 5 && data.connectedDevice) {
-        await supabase.from("device_connections").insert({
-          user_id: user.id,
-          device_type: data.connectedDevice,
-          source_platform: data.connectedDevice,
-          is_active: true,
-        });
-      }
-      if (s === 6) {
-        await updatePersonalisation({ theme: data.theme, messageTone: data.tone });
-      }
-    } catch {
-      /* silent — don't block user */
+
+    if (s === 1) {
+      const { error } = await supabase.from("client_profiles").upsert({
+        id: user.id,
+        date_of_birth: data.dob.length === 10
+          ? `${data.dob.slice(6)}-${data.dob.slice(3, 5)}-${data.dob.slice(0, 2)}`
+          : null,
+        height_cm: toCm(data.height, data.heightUnit),
+        weight_kg: toKg(data.weight, data.weightUnit),
+      }, { onConflict: "id" });
+      if (error) console.error("[onboarding step 1]", error);
+    }
+
+    if (s === 2) {
+      const { error } = await supabase.from("client_profiles").upsert({
+        id: user.id,
+        primary_concerns: data.foodConcerns,
+      }, { onConflict: "id" });
+      if (error) console.error("[onboarding step 2]", error);
+    }
+
+    if (s === 3) {
+      const { data: existing } = await supabase.from("client_profiles").select("intake_survey_responses").eq("id", user.id).maybeSingle();
+      const prev = (existing?.intake_survey_responses as Record<string, unknown>) ?? {};
+      const { error } = await supabase.from("client_profiles").upsert({
+        id: user.id,
+        intake_survey_responses: { ...prev, emotional_patterns: data.emotionSliders, triggers: data.triggers },
+      }, { onConflict: "id" });
+      if (error) console.error("[onboarding step 3]", error);
+    }
+
+    if (s === 4) {
+      const { data: existing } = await supabase.from("client_profiles").select("intake_survey_responses").eq("id", user.id).maybeSingle();
+      const prev = (existing?.intake_survey_responses as Record<string, unknown>) ?? {};
+      const { error } = await supabase.from("client_profiles").upsert({
+        id: user.id,
+        co_occurring_conditions: data.conditions,
+        intake_survey_responses: {
+          ...prev,
+          specialist_code: data.specialistCode || null,
+          other_condition: data.otherCondition || null,
+        },
+      }, { onConflict: "id" });
+      if (error) console.error("[onboarding step 4]", error);
+    }
+
+    if (s === 5 && data.connectedDevice) {
+      const { error } = await supabase.from("device_connections").insert({
+        user_id: user.id,
+        device_type: data.connectedDevice,
+        source_platform: data.connectedDevice,
+        is_active: true,
+      });
+      if (error) console.error("[onboarding step 5]", error);
+    }
+
+    if (s === 6) {
+      await updatePersonalisation({ theme: data.theme, messageTone: data.tone });
     }
   };
 
@@ -201,6 +213,7 @@ export default function Onboarding() {
     } else {
       await updatePersonalisation({ crisisContactName: data.crisisName, crisisContactPhone: data.crisisPhone });
       await markIntakeSurveyCompleted();
+      refreshProfile();
       navigate("/dashboard");
     }
   };

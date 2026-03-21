@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User, Bell, Shield, SlidersHorizontal, Copy, Trash2, Download, AlertTriangle } from "lucide-react";
+import { User, Bell, Shield, SlidersHorizontal, Copy, Trash2, Download, AlertTriangle, ClipboardList } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,16 +19,13 @@ const DEFAULT_PREFS = {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns } = useApp();
+  const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted } = useApp();
   const { user, role } = useAuth();
 
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
   const [device, setDevice] = useState<{ deviceType: string; lastSync: string | null; isActive: boolean | null } | null>(null);
   const [specialistName, setSpecialistName] = useState<string | null>(null);
 
-  /* Notifications */
-  const quietFrom = personalisation.quietHoursStart;
-  const quietTo = personalisation.quietHoursEnd;
   const [deleteModal, setDeleteModal] = useState(false);
   const language = personalisation.language;
   const notifs = {
@@ -230,10 +227,39 @@ export default function SettingsPage() {
                 <span className="text-xs text-muted-foreground">No concerns set yet</span>
               )}
             </div>
+            {(heightCm || weightKg) && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {heightCm ? `${heightCm} cm` : ""}
+                {heightCm && weightKg ? " · " : ""}
+                {weightKg ? `${weightKg} kg` : ""}
+              </p>
+            )}
+            {conditions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {conditions.map((c) => (
+                  <span key={c} className="chip-biometric px-2.5 py-1 rounded-full text-xs">{c}</span>
+                ))}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground mt-2">Started {joinedWeeksAgo} weeks ago</p>
           </div>
         </div>
       </div>
+
+      {/* ─── INCOMPLETE PROFILE BANNER ─── */}
+      {!intakeSurveyCompleted && (
+        <button
+          onClick={() => navigate("/onboarding")}
+          className="w-full rounded-xl p-4 flex items-center gap-3 text-left transition-colors hover:opacity-90 active:scale-[0.98]"
+          style={{ backgroundColor: "#FFF9E6", border: "1px solid #FCD34D" }}
+        >
+          <ClipboardList size={18} style={{ color: "#B45309" }} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium" style={{ color: "#B45309" }}>Complete your health profile</p>
+            <p className="text-xs text-muted-foreground">Finish the setup survey so PULZ can personalise your experience.</p>
+          </div>
+        </button>
+      )}
 
       {/* ─── DEVICE CARD ─── */}
       <div className="bg-card rounded-xl p-6 card-physiological slide-up" style={{ animationDelay: "120ms" }}>
@@ -331,24 +357,11 @@ export default function SettingsPage() {
           <Toggle on={personalisation.soundEnabled} onToggle={() => updatePersonalisation({ soundEnabled: !personalisation.soundEnabled })} />
         </div>
 
-        {/* Quiet hours */}
-        <div className="flex items-center justify-between py-2.5">
-          <span className="text-sm text-muted-foreground">Quiet hours</span>
-          <div className="flex items-center gap-2">
-            <input
-              type="time"
-              value={quietFrom}
-              onChange={(e) => updatePersonalisation({ quietHoursStart: e.target.value })}
-              className="rounded-lg border border-border px-2 py-1 text-xs font-mono focus:outline-none focus:border-[#b3ecec] transition"
-            />
-            <span className="text-xs text-muted-foreground">to</span>
-            <input
-              type="time"
-              value={quietTo}
-              onChange={(e) => updatePersonalisation({ quietHoursEnd: e.target.value })}
-              className="rounded-lg border border-border px-2 py-1 text-xs font-mono focus:outline-none focus:border-[#b3ecec] transition"
-            />
-          </div>
+        <div
+          className="mt-2 rounded-xl px-4 py-3 text-xs"
+          style={{ backgroundColor: "#EEF3FB", color: "#4A5568" }}
+        >
+          PULZ notifications are always on to keep you safe. For concerns about notification frequency, speak with your specialist.
         </div>
       </div>
 
@@ -413,6 +426,27 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* ─── CRISIS CONTACT CARD ─── */}
+      {(personalisation.crisisContactName || personalisation.crisisContactPhone) && (
+        <div className="rounded-xl p-6 card-shadow slide-up" style={{ backgroundColor: "#FFF5F5", border: "1px solid #FECACA", animationDelay: "330ms" }}>
+          <h3 className="font-heading font-semibold text-base mb-3">Crisis Contact</h3>
+          <div className="space-y-1">
+            {personalisation.crisisContactName && (
+              <p className="text-sm font-medium">{personalisation.crisisContactName}</p>
+            )}
+            {personalisation.crisisContactPhone && (
+              <p className="text-sm text-muted-foreground">{personalisation.crisisContactPhone}</p>
+            )}
+          </div>
+          <button
+            onClick={() => navigate("/personalise")}
+            className="mt-3 text-xs text-muted-foreground hover:underline"
+          >
+            Edit in Personalise →
+          </button>
+        </div>
+      )}
 
       {/* ─── APPEARANCE CARD ─── */}
       <div className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-5 slide-up" style={{ animationDelay: "360ms" }}>

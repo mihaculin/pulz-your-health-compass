@@ -98,14 +98,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: selectedRole,
       });
 
-      // Update profile name
-      await supabase.from("profiles").update({ full_name: fullName }).eq("user_id", data.user.id);
+      // Update profile name (row created by DB trigger on auth.users)
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .upsert({ user_id: data.user.id, full_name: fullName }, { onConflict: "user_id" });
+      if (profileErr) console.error("[signUp] profiles upsert", profileErr);
 
       // Create role-specific profile
       if (selectedRole === "client") {
-        await supabase.from("client_profiles").insert({ id: data.user.id });
+        const { error: cpErr } = await supabase
+          .from("client_profiles")
+          .upsert({ id: data.user.id }, { onConflict: "id" });
+        if (cpErr) console.error("[signUp] client_profiles upsert", cpErr);
       } else {
-        await supabase.from("specialist_profiles").insert({ id: data.user.id });
+        const { error: spErr } = await supabase
+          .from("specialist_profiles")
+          .upsert({ id: data.user.id }, { onConflict: "id" });
+        if (spErr) console.error("[signUp] specialist_profiles upsert", spErr);
       }
 
       setRole(selectedRole);

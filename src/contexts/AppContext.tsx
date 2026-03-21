@@ -19,8 +19,6 @@ export interface PersonalisationSettings {
   soundType: string;
   soundVolume: number;
   language: string;
-  quietHoursStart: string;
-  quietHoursEnd: string;
 }
 
 const DEFAULT_PERSONALISATION: PersonalisationSettings = {
@@ -38,8 +36,6 @@ const DEFAULT_PERSONALISATION: PersonalisationSettings = {
   soundType: "Soft chime",
   soundVolume: 50,
   language: "English",
-  quietHoursStart: "22:00",
-  quietHoursEnd: "08:00",
 };
 
 interface AppContextType {
@@ -52,10 +48,15 @@ interface AppContextType {
   personalisation: PersonalisationSettings;
   dateOfBirth: string | null;
   primaryConcerns: string[];
+  heightCm: number | null;
+  weightKg: number | null;
+  conditions: string[];
+  specialistCode: string | null;
   riskLevel: "Calm" | "Elevated" | "Trigger Risk";
   updatePersonalisation: (patch: Partial<PersonalisationSettings>) => Promise<void>;
   markIntakeSurveyCompleted: () => Promise<void>;
   setRiskLevel: (level: "Calm" | "Elevated" | "Trigger Risk") => void;
+  refreshProfile: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -76,8 +77,6 @@ function rowToPersonalisation(row: Tables<"personalisation_settings">): Personal
     soundType: row.sound_type ?? "Soft chime",
     soundVolume: row.sound_volume ?? 50,
     language: row.language ?? "English",
-    quietHoursStart: row.quiet_hours_start ?? "22:00",
-    quietHoursEnd: row.quiet_hours_end ?? "08:00",
   };
 }
 
@@ -105,9 +104,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [psId, setPsId] = useState<string | null>(null);
   const [riskLevel, setRiskLevel] = useState<"Calm" | "Elevated" | "Trigger Risk">("Calm");
   const [hasDevice, setHasDevice] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
   const [primaryConcerns, setPrimaryConcerns] = useState<string[]>([]);
+  const [heightCm, setHeightCm] = useState<number | null>(null);
+  const [weightKg, setWeightKg] = useState<number | null>(null);
+  const [conditions, setConditions] = useState<string[]>([]);
+  const [specialistCode, setSpecialistCode] = useState<string | null>(null);
   const prevUserId = useRef<string | null>(null);
+
+  const refreshProfile = () => {
+    prevUserId.current = null;
+    setRefreshTick((t) => t + 1);
+  };
 
   useEffect(() => {
     if (!user) {
@@ -120,6 +129,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setHasDevice(false);
       setDateOfBirth(null);
       setPrimaryConcerns([]);
+      setHeightCm(null);
+      setWeightKg(null);
+      setConditions([]);
+      setSpecialistCode(null);
       return;
     }
 
@@ -135,7 +148,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         role === "client"
           ? supabase
               .from("client_profiles")
-              .select("intake_survey_completed, date_of_birth, primary_concerns")
+              .select("intake_survey_completed, date_of_birth, primary_concerns, height_cm, weight_kg, co_occurring_conditions, intake_survey_responses")
               .eq("id", user.id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -154,6 +167,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIntakeSurveyCompleted(true);
         setDateOfBirth(null);
         setPrimaryConcerns([]);
+        setHeightCm(null);
+        setWeightKg(null);
+        setConditions([]);
+        setSpecialistCode(null);
       } else {
         const dbCompleted = cpRes.data?.intake_survey_completed ?? false;
         const completed = dbCompleted || localOnboardingDone;
@@ -166,6 +183,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         setDateOfBirth(cpRes.data?.date_of_birth ?? null);
         setPrimaryConcerns(cpRes.data?.primary_concerns ?? []);
+        setHeightCm((cpRes.data as any)?.height_cm ?? null);
+        setWeightKg((cpRes.data as any)?.weight_kg ?? null);
+        setConditions((cpRes.data as any)?.co_occurring_conditions ?? []);
+        const isr = (cpRes.data as any)?.intake_survey_responses;
+        setSpecialistCode(isr?.specialist_code ?? null);
       }
 
       if (psRes.data) {
@@ -179,7 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     load();
-  }, [user, role]);
+  }, [user, role, refreshTick]);
 
   const updatePersonalisation = async (patch: Partial<PersonalisationSettings>) => {
     const next = { ...personalisation, ...patch };
@@ -207,8 +229,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sound_type: next.soundType,
       sound_volume: next.soundVolume,
       language: next.language,
-      quiet_hours_start: next.quietHoursStart,
-      quiet_hours_end: next.quietHoursEnd,
       updated_at: new Date().toISOString(),
     };
 
@@ -249,10 +269,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         personalisation,
         dateOfBirth,
         primaryConcerns,
+        heightCm,
+        weightKg,
+        conditions,
+        specialistCode,
         riskLevel,
         updatePersonalisation,
         markIntakeSurveyCompleted,
         setRiskLevel,
+        refreshProfile,
       }}
     >
       {children}
