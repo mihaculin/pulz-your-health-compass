@@ -9,7 +9,9 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    fullName: string
+    fullName: string,
+    consentGiven: boolean,
+    termsAgreed: boolean
   ) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -46,22 +48,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    consentGiven: boolean,
+    termsAgreed: boolean
+  ) => {
+    const consentTimestamp = consentGiven ? new Date().toISOString() : null;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: {
+          full_name: fullName,
+          consent_given: consentGiven,
+          terms_agreed: termsAgreed,
+        },
         emailRedirectTo: window.location.origin,
       },
     });
 
     if (error) return { error };
 
-    if (data.user) {
+    if (data.user && data.session) {
       const { error: profileErr } = await supabase
         .from("profiles")
-        .upsert({ user_id: data.user.id, full_name: fullName }, { onConflict: "user_id" });
+        .upsert(
+          {
+            user_id: data.user.id,
+            full_name: fullName,
+            consent_given: consentGiven,
+            consent_timestamp: consentTimestamp,
+          },
+          { onConflict: "user_id" }
+        );
       if (profileErr) console.error("[signUp] profiles upsert", profileErr);
 
       const { error: cpErr } = await supabase

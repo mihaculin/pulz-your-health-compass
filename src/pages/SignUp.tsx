@@ -23,6 +23,18 @@ export default function SignUp() {
   const { toast } = useToast();
   const { t } = useLanguage();
 
+  const isEmailTakenError = (message: string) => {
+    const msg = message.toLowerCase();
+    return (
+      msg.includes("already registered") ||
+      msg.includes("already been registered") ||
+      msg.includes("already exists") ||
+      (msg.includes("email") && msg.includes("already")) ||
+      msg.includes("duplicate key") ||
+      msg.includes("unique constraint")
+    );
+  };
+
   useEffect(() => {
     const pending = localStorage.getItem("pulz_pending_confirmation");
     if (pending === "true") {
@@ -35,11 +47,17 @@ export default function SignUp() {
     if (!consent || !termsAgreed) return;
     setSubmitting(true);
 
-    const { error, needsEmailConfirmation } = await signUp(email, password, fullName);
+    const { error, needsEmailConfirmation } = await signUp(
+      email,
+      password,
+      fullName,
+      consent,
+      termsAgreed
+    );
     setSubmitting(false);
 
     if (error) {
-      if (error.message.toLowerCase().includes("already registered") || error.message.toLowerCase().includes("already been registered")) {
+      if (isEmailTakenError(error.message)) {
         setAlreadyRegistered(true);
       } else {
         toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
