@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { ClinicalDisclaimer } from "@/components/ClinicalDisclaimer";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="fade-in">
               {children}
             </div>
+            <ClinicalDisclaimer />
           </main>
         </div>
       </div>

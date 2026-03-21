@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppProvider, useApp } from "@/contexts/AppContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { CookieBanner } from "@/components/CookieBanner";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Welcome from "./pages/Welcome";
 import SignUp from "./pages/SignUp";
@@ -69,6 +70,7 @@ const App = () => (
             <AppRoutes />
           </AppProvider>
         </AuthProvider>
+        <CookieBanner />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { LegalModal, TermsContent, PrivacyContent } from "@/components/LegalModal";
 
 type SelectedRole = "client" | "specialist" | null;
 
@@ -15,7 +16,10 @@ export default function SignUp() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [consent, setConsent] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -34,7 +38,7 @@ export default function SignUp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRole || !consent) return;
+    if (!selectedRole || !consent || !termsAgreed) return;
     setSubmitting(true);
 
     const { error, needsEmailConfirmation } = await signUp(email, password, fullName, selectedRole);
@@ -116,15 +120,39 @@ export default function SignUp() {
             </div>
 
             <label className="flex items-start gap-3 text-sm cursor-pointer">
-              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 rounded" />
+              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 rounded shrink-0" />
               <span className="text-muted-foreground leading-relaxed">
                 I understand PULZ is a wellness tool, not a medical device. I consent to my data being processed for personalized insights.
               </span>
             </label>
 
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <input type="checkbox" checked={termsAgreed} onChange={(e) => setTermsAgreed(e.target.checked)} className="mt-0.5 rounded shrink-0" />
+              <span className="text-muted-foreground leading-relaxed">
+                I have read and agree to the{" "}
+                <button
+                  type="button"
+                  onClick={() => setTermsOpen(true)}
+                  className="underline font-medium"
+                  style={{ color: "hsl(var(--primary))" }}
+                >
+                  Terms of Service
+                </button>
+                {" "}and{" "}
+                <button
+                  type="button"
+                  onClick={() => setPrivacyOpen(true)}
+                  className="underline font-medium"
+                  style={{ color: "hsl(var(--primary))" }}
+                >
+                  Privacy Policy
+                </button>
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={!consent || submitting}
+              disabled={!consent || !termsAgreed || submitting}
               className="w-full py-3 rounded-2xl font-medium text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
               style={{ backgroundColor: "hsl(var(--primary))" }}
             >
@@ -137,6 +165,14 @@ export default function SignUp() {
           </form>
         )}
       </div>
+
+      <LegalModal isOpen={termsOpen} onClose={() => setTermsOpen(false)} title="Terms of Service">
+        <TermsContent />
+      </LegalModal>
+
+      <LegalModal isOpen={privacyOpen} onClose={() => setPrivacyOpen(false)} title="Privacy Policy">
+        <PrivacyContent />
+      </LegalModal>
     </div>
   );
 }
