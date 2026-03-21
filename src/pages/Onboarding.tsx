@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, ChevronLeft, Check, Watch, Activity, Heart, Smartphone } from "lucide-react";
+import { ChevronRight, ChevronLeft, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import translations from "@/translations";
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 type HeightUnit = "cm" | "ft";
 type WeightUnit = "kg" | "lbs";
@@ -28,7 +28,6 @@ interface OnboardingData {
   conditions: string[];
   otherCondition: string;
   specialistCode: string;
-  connectedDevice: string | null;
   theme: string;
   tone: Tone;
   crisisName: string;
@@ -49,7 +48,6 @@ const DEFAULT: OnboardingData = {
   conditions: [],
   otherCondition: "",
   specialistCode: "",
-  connectedDevice: null,
   theme: "aqua-bloom",
   tone: "gentle",
   crisisName: "",
@@ -60,12 +58,6 @@ const DEFAULT: OnboardingData = {
 const FOOD_CONCERNS = ["Binge eating", "Restrictive eating", "Emotional eating", "Purging behaviours", "Overeating", "Food anxiety", "Body image concerns", "None of the above"];
 const TRIGGERS = ["Work stress", "Relationships", "Loneliness", "Financial stress", "Health concerns", "Body image", "Social situations", "Other"];
 const CONDITIONS = ["Diabetes", "PCOS", "IBS / digestive issues", "Thyroid condition", "Chronic pain", "Mental health diagnosis", "None", "Other"];
-const DEVICES = [
-  { id: "apple_watch", label: "Apple Watch", icon: Watch, color: "#1C1C1E" },
-  { id: "garmin", label: "Garmin", icon: Activity, color: "#006E51" },
-  { id: "fitbit", label: "Fitbit", icon: Heart, color: "#00B0B9" },
-  { id: "samsung", label: "Samsung Galaxy", icon: Smartphone, color: "#1428A0" },
-];
 const TONE_PREVIEWS: Record<Tone, string> = {
   gentle: "Hey, I noticed your heart rate went up a little — that's okay. Let's take a breath together. 💚",
   direct: "Heart rate spike detected at 14:32. Suggested action: 4-7-8 breathing for 2 minutes.",
@@ -146,7 +138,7 @@ export default function Onboarding() {
   const canAdvance = () => {
     if (step === 1) return data.dob.length === 10 && data.height !== "" && data.weight !== "";
     if (step === 2) return data.foodConcerns.length > 0;
-    if (step === 7) return data.safetyAgreed;
+    if (step === 6) return data.safetyAgreed;
     return true;
   };
 
@@ -198,17 +190,7 @@ export default function Onboarding() {
       if (error) { console.error("[onboarding step 4]", error); toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
 
-    if (s === 5 && data.connectedDevice) {
-      const { error } = await supabase.from("device_connections").insert({
-        user_id: user.id,
-        device_type: data.connectedDevice,
-        source_platform: data.connectedDevice,
-        is_active: true,
-      });
-      if (error) { console.error("[onboarding step 5]", error); toast({ title: "Device connection failed", description: error.message, variant: "destructive" }); }
-    }
-
-    if (s === 6) {
+    if (s === 5) {
       await updatePersonalisation({ theme: data.theme, messageTone: data.tone });
     }
   };
@@ -243,9 +225,8 @@ export default function Onboarding() {
           {step === 2 && <Step2 data={data} toggle={toggle} t={t} />}
           {step === 3 && <Step3 data={data} update={update} toggle={toggle} t={t} />}
           {step === 4 && <Step4 data={data} update={update} toggle={toggle} t={t} />}
-          {step === 5 && <Step5 data={data} update={update} t={t} />}
-          {step === 6 && <Step6 data={data} update={update} t={t} />}
-          {step === 7 && <Step7 data={data} update={update} t={t} />}
+          {step === 5 && <Step6 data={data} update={update} t={t} />}
+          {step === 6 && <Step7 data={data} update={update} t={t} />}
         </div>
 
         <div className="flex items-center justify-between pt-8 mt-auto">
@@ -355,33 +336,6 @@ function Step4({ data, update, toggle, t }: { data: OnboardingData; update: <K e
         <p className="text-xs text-muted-foreground">{t("onboarding.specialistCodeDesc")}</p>
         <input type="text" value={data.specialistCode} onChange={(e) => update("specialistCode", e.target.value)} placeholder={t("onboarding.specialistCodePlaceholder")} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card font-mono focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
       </div>
-    </div>
-  );
-}
-
-function Step5({ data, update, t }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; t: Tf }) {
-  return (
-    <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step5Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step5Desc")}</p></div>
-      <div className="grid grid-cols-2 gap-3">
-        {DEVICES.map(({ id, label, icon: Icon, color }) => {
-          const selected = data.connectedDevice === id;
-          return (
-            <button key={id} type="button" onClick={() => update("connectedDevice", selected ? null : id)}
-              className="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all hover:shadow-md active:scale-[0.97]"
-              style={selected ? { backgroundColor: "#b3ecec", borderColor: "#b3ecec" } : { backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}>
-              <div className="p-3 rounded-xl" style={{ backgroundColor: selected ? "rgba(255,255,255,0.5)" : `${color}18` }}>
-                <Icon size={24} style={{ color: selected ? "#1A4040" : color }} />
-              </div>
-              <span className="text-sm font-medium" style={{ color: selected ? "#1A4040" : "hsl(var(--foreground))" }}>{label}</span>
-              {selected && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.6)", color: "#1A4040" }}>{t("onboarding.connected")}</span>}
-            </button>
-          );
-        })}
-      </div>
-      <button type="button" onClick={() => update("connectedDevice", null)} className="w-full py-3 rounded-2xl text-sm text-muted-foreground border border-dashed transition-colors hover:text-foreground" style={{ borderColor: "hsl(var(--border))" }}>
-        {t("onboarding.skipDevice")}
-      </button>
     </div>
   );
 }

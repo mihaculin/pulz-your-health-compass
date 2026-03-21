@@ -339,7 +339,7 @@ const translations = {
       crisisPhonePlaceholder: "e.g. +40 712 345 678",
       safetyAgreement: "I understand PULZ is a wellness support tool, not a medical device or crisis service. In an emergency I will contact emergency services or a qualified professional.",
       saving: "Saving…",
-      stepLabels: ["About you", "Food relationship", "Emotional patterns", "Physical health", "Connect device", "Personalise", "Safety setup"],
+      stepLabels: ["About you", "Food relationship", "Emotional patterns", "Physical health", "Personalise", "Safety setup"],
     },
     specialist: {
       title: "Specialist Dashboard",
@@ -711,7 +711,7 @@ const translations = {
       crisisPhonePlaceholder: "ex. +40 712 345 678",
       safetyAgreement: "Înțeleg că PULZ este un instrument de suport pentru wellness, nu un dispozitiv medical sau serviciu de criză. În caz de urgență voi contacta serviciile de urgență sau un profesionist calificat.",
       saving: "Se salvează…",
-      stepLabels: ["Despre tine", "Relația cu mâncarea", "Tipare emoționale", "Sănătate fizică", "Conectare dispozitiv", "Personalizare", "Configurare siguranță"],
+      stepLabels: ["Despre tine", "Relația cu mâncarea", "Tipare emoționale", "Sănătate fizică", "Personalizare", "Configurare siguranță"],
     },
     specialist: {
       title: "Panou Specialist",
