@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -15,6 +16,7 @@ export default function SignIn() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const pending = localStorage.getItem("pulz_pending_confirmation");
@@ -22,11 +24,11 @@ export default function SignIn() {
     if (pending === "true" && pendingEmail) {
       setEmail(pendingEmail);
       toast({
-        title: "Email confirmation required",
+        title: t("signIn.checkEmail"),
         description: "Confirm your email, then sign in.",
       });
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +45,6 @@ export default function SignIn() {
     localStorage.removeItem("pulz_pending_confirmation");
     localStorage.removeItem("pulz_pending_email");
 
-    // Role-based redirect handled by App.tsx
     navigate("/dashboard");
   };
 
@@ -58,7 +59,7 @@ export default function SignIn() {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Check your email", description: "Password reset link sent." });
+      toast({ title: t("signIn.checkEmail"), description: t("signIn.resetLinkSent") });
       setResetMode(false);
     }
   };
@@ -67,29 +68,29 @@ export default function SignIn() {
     <div className="min-h-screen flex items-center justify-center px-6" style={{ background: "hsl(var(--background))" }}>
       <div className="w-full max-w-md space-y-6 slide-up">
         <button onClick={() => (resetMode ? setResetMode(false) : navigate("/"))} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft size={16} /> Back
+          <ArrowLeft size={16} /> {t("common.back")}
         </button>
 
         <h1 className="text-2xl font-heading font-semibold" style={{ color: "hsl(var(--primary))" }}>
-          {resetMode ? "Reset password" : "Welcome back"}
+          {resetMode ? t("signIn.resetTitle") : t("signIn.title")}
         </h1>
 
         <form onSubmit={resetMode ? handleReset : handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+            <Label htmlFor="email">{t("signIn.email")}</Label>
+            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("signIn.emailPlaceholder")} required />
           </div>
 
           {!resetMode && (
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" required />
+              <Label htmlFor="password">{t("signIn.password")}</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("signIn.passwordPlaceholder")} required />
             </div>
           )}
 
           {!resetMode && (
             <button type="button" onClick={() => setResetMode(true)} className="text-sm text-muted-foreground hover:underline">
-              Forgot password?
+              {t("signIn.forgotPassword")}
             </button>
           )}
 
@@ -99,12 +100,14 @@ export default function SignIn() {
             className="w-full py-3 rounded-2xl font-medium text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
             style={{ backgroundColor: "hsl(var(--primary))" }}
           >
-            {submitting ? (resetMode ? "Sending…" : "Signing in…") : resetMode ? "Send reset link" : "Sign in"}
+            {submitting
+              ? (resetMode ? t("signIn.sending") : t("signIn.signingIn"))
+              : resetMode ? t("signIn.sendResetLink") : t("signIn.signIn")}
           </button>
 
           {!resetMode && (
             <p className="text-center text-sm text-muted-foreground">
-              New to PULZ? <Link to="/signup" className="underline" style={{ color: "hsl(var(--primary))" }}>Create account</Link>
+              {t("signIn.newToPulz")} <Link to="/signup" className="underline" style={{ color: "hsl(var(--primary))" }}>{t("signIn.createAccount")}</Link>
             </p>
           )}
         </form>

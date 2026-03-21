@@ -96,7 +96,7 @@ function weeksAgo(iso: string): number {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const [appLoading, setAppLoading] = useState(true);
   const [fullName, setFullName] = useState("");
   const [joinedAt, setJoinedAt] = useState(new Date().toISOString());
@@ -139,11 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Wait until role is resolved — prevents a partial fetch with role=null
-    if (role === null) return;
-
-    // Deduplicate: only re-fetch when user+role combination actually changes
-    const fetchKey = `${user.id}:${role}:${refreshTick}`;
+    const fetchKey = `${user.id}:${refreshTick}`;
     if (lastFetchKey.current === fetchKey) return;
     lastFetchKey.current = fetchKey;
 
@@ -179,13 +175,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const [profileRes, psRes, cpRes, deviceRes] = await Promise.all([
         supabase.from("profiles").select("full_name, created_at").eq("user_id", user.id).maybeSingle(),
         supabase.from("personalisation_settings").select("*").eq("user_id", user.id).maybeSingle(),
-        role === "client"
-          ? supabase
-              .from("client_profiles")
-              .select("intake_survey_completed, date_of_birth, primary_concerns, height_cm, weight_kg, co_occurring_conditions, intake_survey_responses")
-              .eq("id", user.id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+        supabase
+          .from("client_profiles")
+          .select("intake_survey_completed, date_of_birth, primary_concerns, height_cm, weight_kg, co_occurring_conditions, intake_survey_responses")
+          .eq("id", user.id)
+          .maybeSingle(),
         supabase.from("device_connections").select("id").eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle(),
       ]);
       setHasDevice(!!deviceRes.data);
@@ -202,34 +196,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const localOnboardingDone = localStorage.getItem("pulz_onboarding_completed") === "true";
 
-      if (role === "specialist") {
-        setIntakeSurveyCompleted(true);
-        setDateOfBirth(null);
-        setPrimaryConcerns([]);
-        setHeightCm(null);
-        setWeightKg(null);
-        setConditions([]);
-        setSpecialistCode(null);
-        setSurveyTriggers([]);
-      } else {
-        const dbCompleted = cpRes.data?.intake_survey_completed ?? false;
-        const completed = dbCompleted || localOnboardingDone;
-        setIntakeSurveyCompleted(completed);
-        if (completed && !dbCompleted) {
-          await supabase
-            .from("client_profiles")
-            .update({ intake_survey_completed: true, onboarding_completed: true })
-            .eq("id", user.id);
-        }
-        setDateOfBirth(cpRes.data?.date_of_birth ?? null);
-        setPrimaryConcerns(cpRes.data?.primary_concerns ?? []);
-        setHeightCm((cpRes.data as any)?.height_cm ?? null);
-        setWeightKg((cpRes.data as any)?.weight_kg ?? null);
-        setConditions((cpRes.data as any)?.co_occurring_conditions ?? []);
-        const isr = (cpRes.data as any)?.intake_survey_responses;
-        setSpecialistCode(isr?.specialist_code ?? null);
-        setSurveyTriggers(isr?.triggers ?? []);
+      const dbCompleted = cpRes.data?.intake_survey_completed ?? false;
+      const completed = dbCompleted || localOnboardingDone;
+      setIntakeSurveyCompleted(completed);
+      if (completed && !dbCompleted) {
+        await supabase
+          .from("client_profiles")
+          .update({ intake_survey_completed: true, onboarding_completed: true })
+          .eq("id", user.id);
       }
+      setDateOfBirth(cpRes.data?.date_of_birth ?? null);
+      setPrimaryConcerns(cpRes.data?.primary_concerns ?? []);
+      setHeightCm((cpRes.data as any)?.height_cm ?? null);
+      setWeightKg((cpRes.data as any)?.weight_kg ?? null);
+      setConditions((cpRes.data as any)?.co_occurring_conditions ?? []);
+      const isr = (cpRes.data as any)?.intake_survey_responses;
+      setSpecialistCode(isr?.specialist_code ?? null);
+      setSurveyTriggers(isr?.triggers ?? []);
 
       let nextPs = personalisation;
       let nextPsId = psId;
@@ -245,16 +228,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const nextName = profileRes.data?.full_name ?? fullName;
       const nextJoinedAt = profileRes.data?.created_at ?? joinedAt;
       const localOnboardingDone2 = localStorage.getItem("pulz_onboarding_completed") === "true";
-      const nextCompleted = role === "specialist"
-        ? true
-        : ((cpRes.data?.intake_survey_completed ?? false) || localOnboardingDone2);
+      const nextCompleted = (cpRes.data?.intake_survey_completed ?? false) || localOnboardingDone2;
       const nextHasDevice = !!deviceRes.data;
-      const nextDob = role === "specialist" ? null : (cpRes.data?.date_of_birth ?? null);
-      const nextConcerns = role === "specialist" ? [] : (cpRes.data?.primary_concerns ?? []);
-      const nextHeight = role === "specialist" ? null : ((cpRes.data as any)?.height_cm ?? null);
-      const nextWeight = role === "specialist" ? null : ((cpRes.data as any)?.weight_kg ?? null);
-      const nextConds = role === "specialist" ? [] : ((cpRes.data as any)?.co_occurring_conditions ?? []);
-      const nextIsr = role === "specialist" ? null : (cpRes.data as any)?.intake_survey_responses;
+      const nextDob = cpRes.data?.date_of_birth ?? null;
+      const nextConcerns = cpRes.data?.primary_concerns ?? [];
+      const nextHeight = (cpRes.data as any)?.height_cm ?? null;
+      const nextWeight = (cpRes.data as any)?.weight_kg ?? null;
+      const nextConds = (cpRes.data as any)?.co_occurring_conditions ?? [];
+      const nextIsr = (cpRes.data as any)?.intake_survey_responses;
       const nextCode = nextIsr?.specialist_code ?? null;
       const nextTriggers = nextIsr?.triggers ?? [];
 
@@ -278,7 +259,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     load();
-  }, [user, role, refreshTick]);
+  }, [user, refreshTick]);
 
   const updatePersonalisation = async (patch: Partial<PersonalisationSettings>) => {
     const next = { ...personalisation, ...patch };

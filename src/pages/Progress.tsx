@@ -3,6 +3,7 @@ import { ArrowUpRight, Lightbulb } from "lucide-react";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Area, AreaChart,
 } from "recharts";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const weeklyEpisodes = [
   { day: "Mon", count: 2 }, { day: "Tue", count: 4 }, { day: "Wed", count: 1 },
@@ -21,25 +22,25 @@ const triggers = [
 
 const maxTrigger = Math.max(...triggers.map((t) => t.count));
 
-const ranges = ["This week", "This month", "Last 3 months"];
-
-const insights = [
-  "Your most vulnerable window is 13:00–15:00 — plan something grounding then.",
-  "Episodes decrease significantly on days with movement activity.",
-  "7 entries show loneliness as a secondary trigger. Would you like to explore this?",
-];
-
 const highestDay = weeklyEpisodes.reduce((a, b) => (b.count > a.count ? b : a)).day;
 
 export default function Progress() {
-  const [range, setRange] = useState("This week");
+  const { t } = useLanguage();
+  const ranges = [t("progress.thisWeek"), t("progress.thisMonth"), t("progress.last3Months")];
+  const [range, setRange] = useState(ranges[0]);
+
+  const insights = [
+    t("progress.insight1"),
+    t("progress.insight2"),
+    t("progress.insight3"),
+  ];
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-8">
       <div className="flex items-center justify-between slide-up">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-heading font-semibold">Progress</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Track patterns and celebrate growth.</p>
+          <h1 className="text-2xl lg:text-3xl font-heading font-semibold">{t("progress.title")}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t("progress.subtitle")}</p>
         </div>
         <div className="flex gap-1.5 bg-muted rounded-lg p-1">
           {ranges.map((r) => (
@@ -55,11 +56,9 @@ export default function Progress() {
         </div>
       </div>
 
-      {/* Charts grid */}
       <div className="grid lg:grid-cols-2 gap-4">
-        {/* Episode Frequency — physiological card */}
         <div className="bg-card rounded-xl p-6 card-physiological slide-up" style={{ animationDelay: "60ms" }}>
-          <h3 className="font-heading font-semibold text-sm mb-4">Episode Frequency</h3>
+          <h3 className="font-heading font-semibold text-sm mb-4">{t("progress.episodeFrequency")}</h3>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weeklyEpisodes}>
@@ -77,9 +76,8 @@ export default function Progress() {
           </div>
         </div>
 
-        {/* Calm Trend — emotional card */}
         <div className="bg-card rounded-xl p-6 card-emotional slide-up" style={{ animationDelay: "120ms" }}>
-          <h3 className="font-heading font-semibold text-sm mb-4">Emotional Calm Score</h3>
+          <h3 className="font-heading font-semibold text-sm mb-4">{t("progress.calmScore")}</h3>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={calmTrend}>
@@ -101,34 +99,32 @@ export default function Progress() {
         </div>
       </div>
 
-      {/* Trigger Frequency — emotional card */}
       <div className="bg-card rounded-xl p-6 card-emotional slide-up" style={{ animationDelay: "180ms" }}>
-        <h3 className="font-heading font-semibold text-sm mb-4">Trigger Frequency</h3>
+        <h3 className="font-heading font-semibold text-sm mb-4">{t("progress.triggerFrequency")}</h3>
         <div className="space-y-3">
-          {triggers.map((t) => (
-            <div key={t.name} className="flex items-center gap-4">
-              <span className="text-sm w-28 text-right text-muted-foreground">{t.name}</span>
+          {triggers.map((tr) => (
+            <div key={tr.name} className="flex items-center gap-4">
+              <span className="text-sm w-28 text-right text-muted-foreground">{tr.name}</span>
               <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
-                    width: `${(t.count / maxTrigger) * 100}%`,
+                    width: `${(tr.count / maxTrigger) * 100}%`,
                     background: `linear-gradient(90deg, #D7C9DB, #7B5E8A)`,
                   }}
                 />
               </div>
-              <span className="font-mono text-sm tabular-nums w-6">{t.count}</span>
+              <span className="font-mono text-sm tabular-nums w-6">{tr.count}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 slide-up" style={{ animationDelay: "240ms" }}>
         {[
-          { label: "Total episodes", value: "18", sub: "this week" },
-          { label: "Common trigger", value: "Work stress", sub: "most frequent" },
-          { label: "Avg intensity", value: "5.4", sub: "/ 10 daily" },
+          { label: t("progress.totalEpisodes"), value: "18", sub: t("progress.thisWeekSub") },
+          { label: t("progress.commonTrigger"), value: "Work stress", sub: t("progress.mostFrequent") },
+          { label: t("progress.avgIntensity"), value: "5.4", sub: t("progress.perDay") },
         ].map((s) => (
           <div key={s.label} className="bg-card rounded-xl p-5 card-shadow border border-border/50">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{s.label}</p>
@@ -137,18 +133,17 @@ export default function Progress() {
           </div>
         ))}
         <div className="bg-card rounded-xl p-5 card-shadow border border-border/50">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">Improvement</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("progress.improvement")}</p>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-xl font-mono font-semibold text-success tabular-nums">+12%</span>
             <ArrowUpRight size={18} className="text-success" />
           </div>
-          <p className="text-xs text-muted-foreground">vs last week</p>
+          <p className="text-xs text-muted-foreground">{t("progress.vsLastWeek")}</p>
         </div>
       </div>
 
-      {/* Insights — lavender-mist with lavender border */}
       <div className="space-y-3 slide-up" style={{ animationDelay: "300ms" }}>
-        <h2 className="text-lg font-heading font-semibold">Pattern Insights</h2>
+        <h2 className="text-lg font-heading font-semibold">{t("progress.patternInsights")}</h2>
         {insights.map((insight, i) => (
           <div key={i} className="rounded-xl p-5 card-shadow flex items-start gap-3" style={{ backgroundColor: "hsl(276 33% 95%)", borderLeft: "2px solid hsl(284 16% 82%)" }}>
             <Lightbulb size={18} className="text-warning shrink-0 mt-0.5" />

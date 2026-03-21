@@ -1,7 +1,9 @@
-import { LayoutDashboard, BookOpen, TrendingUp, Stethoscope, Settings, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, BookOpen, TrendingUp, Settings, SlidersHorizontal, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { useApp } from "@/contexts/AppContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Sidebar,
   SidebarContent,
@@ -14,20 +16,31 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Journal", url: "/journal", icon: BookOpen },
-  { title: "Progress", url: "/progress", icon: TrendingUp },
-  { title: "Therapist", url: "/therapist", icon: Stethoscope },
-  { title: "Settings", url: "/settings", icon: Settings },
-  { title: "My PULZ", url: "/personalise", icon: SlidersHorizontal },
+const navConfig = [
+  { url: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" },
+  { url: "/journal", icon: BookOpen, key: "nav.journal" },
+  { url: "/progress", icon: TrendingUp, key: "nav.progress" },
+  { url: "/settings", icon: Settings, key: "nav.settings" },
+  { url: "/personalise", icon: SlidersHorizontal, key: "nav.myPulz" },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const { fullName, initials, joinedWeeksAgo } = useApp();
+  const { t } = useLanguage();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("pulz_profile");
+    navigate("/");
+  };
+
+  const weeksLabel = joinedWeeksAgo === 0
+    ? t("nav.justJoined")
+    : `${joinedWeeksAgo} ${joinedWeeksAgo === 1 ? t("nav.weeksIn") : t("nav.weeksInPlural")} ${t("nav.in")}`;
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -41,7 +54,7 @@ export function AppSidebar() {
         )}
         {!collapsed && (
           <p className="text-[11px] text-muted-foreground mt-0.5 tracking-wide uppercase">
-            Behavioral Health
+            {t("nav.behavioralHealth")}
           </p>
         )}
       </div>
@@ -50,14 +63,15 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {navConfig.map((item) => {
+                const title = t(item.key);
                 const active = location.pathname === item.url || (item.url === "/dashboard" && location.pathname === "/");
                 return (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={active}
-                      tooltip={item.title}
+                      tooltip={title}
                     >
                       <NavLink
                         to={item.url}
@@ -71,7 +85,7 @@ export function AppSidebar() {
                         } : undefined}
                       >
                         <item.icon size={19} strokeWidth={active ? 2.2 : 1.8} />
-                        {!collapsed && <span>{item.title}</span>}
+                        {!collapsed && <span>{title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -82,6 +96,17 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
+      <div style={{ borderTop: "1px solid #E8EAED" }}>
+        <button
+          onClick={handleSignOut}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[#F4EEF7] ${collapsed ? "justify-center" : ""}`}
+          style={{ color: "#7B5E8A", background: "transparent" }}
+        >
+          <LogOut size={16} />
+          {!collapsed && <span className="text-sm font-medium">Sign out</span>}
+        </button>
+      </div>
+
       <SidebarFooter className="p-3">
         <div className={`flex items-center gap-3 ${collapsed ? "justify-center" : ""}`}>
           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-heading font-semibold text-sm shrink-0">
@@ -90,7 +115,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{fullName || "—"}</p>
-              <p className="text-xs text-muted-foreground truncate">{joinedWeeksAgo === 0 ? "Just joined" : `${joinedWeeksAgo} week${joinedWeeksAgo === 1 ? "" : "s"} in`}</p>
+              <p className="text-xs text-muted-foreground truncate">{weeksLabel}</p>
             </div>
           )}
         </div>

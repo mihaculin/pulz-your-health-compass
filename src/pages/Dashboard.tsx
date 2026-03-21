@@ -7,6 +7,7 @@ import { InterventionCard } from "@/components/dashboard/InterventionCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { Tables } from "@/integrations/supabase/types";
 
 const MOCK_TIMELINE = [
@@ -44,6 +45,7 @@ type RiskRow = Tables<"risk_windows">;
 export default function Dashboard() {
   const { user } = useAuth();
   const { fullName, riskLevel, setRiskLevel, hasDevice, primaryConcerns } = useApp();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [watchOpen, setWatchOpen] = useState(false);
   const [interventionOpen, setInterventionOpen] = useState(false);
@@ -52,7 +54,8 @@ export default function Dashboard() {
 
   const displayName = fullName ? fullName.split(" ")[0] : "there";
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 12 ? t("dashboard.morning") : hour < 17 ? t("dashboard.afternoon") : t("dashboard.evening");
+  const dateLocale = language === "ro" ? "ro-RO" : "en-US";
 
   useEffect(() => {
     if (!user) return;
@@ -100,11 +103,13 @@ export default function Dashboard() {
   const activityLabel = biometrics.activity ?? "Low";
 
   const statusStyles = {
-    Calm: { badge: "bg-success/10 text-success", gradient: "from-success/5 to-transparent", message: "You're doing great. Stay present." },
-    Elevated: { badge: "bg-warning/10 text-warning", gradient: "from-warning/5 to-transparent", message: "Something's shifting. Take a slow breath." },
-    "Trigger Risk": { badge: "bg-destructive/10 text-destructive", gradient: "from-destructive/5 to-transparent", message: "A moment of care for yourself, right now." },
+    Calm: { badge: "bg-success/10 text-success", gradient: "from-success/5 to-transparent", message: t("dashboard.calmMessage") },
+    Elevated: { badge: "bg-warning/10 text-warning", gradient: "from-warning/5 to-transparent", message: t("dashboard.elevatedMessage") },
+    "Trigger Risk": { badge: "bg-destructive/10 text-destructive", gradient: "from-destructive/5 to-transparent", message: t("dashboard.triggerMessage") },
   };
   const style = statusStyles[riskLevel];
+
+  const riskLabel = riskLevel === "Calm" ? t("dashboard.calm") : riskLevel === "Elevated" ? t("dashboard.elevated") : t("dashboard.triggerRisk");
 
   const episodeRows = episodes && episodes.length > 0
     ? episodes.map((ep) => ({
@@ -127,7 +132,7 @@ export default function Dashboard() {
                 {greeting}, {displayName}
               </h1>
               <p className="text-muted-foreground mt-1 text-sm">
-                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                {new Date().toLocaleDateString(dateLocale, { weekday: "long", month: "long", day: "numeric" })}
               </p>
               {primaryConcerns.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
@@ -138,7 +143,7 @@ export default function Dashboard() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${style.badge}`}>{riskLevel}</span>
+              <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${style.badge}`}>{riskLabel}</span>
               <button className="p-2 rounded-lg hover:bg-muted transition-colors"><Bell size={19} className="text-muted-foreground" /></button>
               <button onClick={() => setWatchOpen(!watchOpen)} className={`p-2 rounded-lg transition-colors ${watchOpen ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}><Watch size={19} /></button>
             </div>
@@ -150,7 +155,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-lg bg-destructive/10"><Heart size={19} className="text-destructive" /></div>
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Heart Rate</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("dashboard.heartRate")}</p>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xl font-mono font-medium tabular-nums">{hr}</span>
                       <span className="chip-biometric px-1.5 py-0.5 rounded text-[10px] font-medium">BPM</span>
@@ -161,21 +166,21 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-lg bg-warning/10"><AlertTriangle size={19} className="text-warning" /></div>
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Stress</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("dashboard.stress")}</p>
                     <span className="text-xl font-mono font-medium tabular-nums">{stress}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-lg" style={{ backgroundColor: "hsla(180, 52%, 81%, 0.15)" }}><Thermometer size={19} style={{ color: "#1A4040" }} /></div>
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Temperature</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("dashboard.temperature")}</p>
                     <span className="text-xl font-mono font-medium tabular-nums">{temp}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-lg bg-primary/10"><Activity size={19} className="text-primary" /></div>
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Movement</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("dashboard.movement")}</p>
                     <span className="text-xl font-mono font-medium tabular-nums capitalize">{activityLabel}</span>
                   </div>
                 </div>
@@ -190,8 +195,8 @@ export default function Dashboard() {
                     <BookOpen size={20} style={{ color: "#2D7D6F" }} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium" style={{ color: "#1A4040" }}>Manual Tracking Mode</p>
-                    <p className="text-xs mt-0.5" style={{ color: "#2D7D6F" }}>You're tracking manually. Log episodes anytime using the Journal.</p>
+                    <p className="text-sm font-medium" style={{ color: "#1A4040" }}>{t("dashboard.manualMode")}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#2D7D6F" }}>{t("dashboard.manualDesc")}</p>
                   </div>
                 </div>
                 <button
@@ -199,7 +204,7 @@ export default function Dashboard() {
                   className="shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-90 active:scale-[0.98]"
                   style={{ backgroundColor: "#2D7D6F", color: "#fff" }}
                 >
-                  Log episode
+                  {t("dashboard.logEpisode")}
                 </button>
               </div>
 
@@ -212,16 +217,16 @@ export default function Dashboard() {
                   <PenLine size={22} style={{ color: "#2D7D6F" }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold" style={{ color: "#1A4040" }}>Log a moment</p>
-                  <p className="text-xs mt-0.5 text-muted-foreground">Record what's happening right now — emotions, triggers, intensity.</p>
+                  <p className="text-sm font-semibold" style={{ color: "#1A4040" }}>{t("dashboard.logMoment")}</p>
+                  <p className="text-xs mt-0.5 text-muted-foreground">{t("dashboard.logMomentDesc")}</p>
                 </div>
-                <span className="text-xs font-medium px-3 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: "#2D7D6F", color: "#fff" }}>Open Journal</span>
+                <span className="text-xs font-medium px-3 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: "#2D7D6F", color: "#fff" }}>{t("dashboard.openJournal")}</span>
               </div>
             </div>
           )}
 
           <div className="bg-card rounded-xl p-6 card-physiological slide-up" style={{ animationDelay: "120ms" }}>
-            <h2 className="text-lg font-heading font-semibold mb-4">Daily Timeline</h2>
+            <h2 className="text-lg font-heading font-semibold mb-4">{t("dashboard.dailyTimeline")}</h2>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={MOCK_TIMELINE}>
@@ -230,8 +235,8 @@ export default function Dashboard() {
                   <YAxis tick={{ fontSize: 12, fontFamily: "DM Mono" }} stroke="hsl(220 9% 46%)" />
                   <Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid hsl(220 13% 91%)", fontFamily: "Inter", fontSize: "13px" }} />
                   <Legend wrapperStyle={{ fontSize: "12px", fontFamily: "Inter" }} />
-                  <Line type="monotone" dataKey="hr" name="Heart Rate" stroke="#b3ecec" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="stress" name="Stress" stroke="hsl(38 92% 50%)" strokeWidth={2} strokeDasharray="6 3" dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="hr" name={t("dashboard.heartRate")} stroke="#b3ecec" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="stress" name={t("dashboard.stress")} stroke="hsl(38 92% 50%)" strokeWidth={2} strokeDasharray="6 3" dot={{ r: 3 }} />
                   <Line type="monotone" dataKey="impulse" name="Impulse" stroke="hsl(0 86% 71%)" strokeWidth={0} dot={{ r: 6, fill: "hsl(0 86% 71%)" }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -239,7 +244,7 @@ export default function Dashboard() {
           </div>
 
           <div className="slide-up" style={{ animationDelay: "180ms" }}>
-            <h2 className="text-lg font-heading font-semibold mb-4">Today's Episodes</h2>
+            <h2 className="text-lg font-heading font-semibold mb-4">{t("dashboard.todaysEpisodes")}</h2>
             <div className="grid gap-3">
               {episodeRows.map((ep, i) => (
                 <div key={i} className="bg-card rounded-xl p-5 card-emotional hover:shadow-md transition-shadow duration-200">
@@ -262,7 +267,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground italic">"{ep.intervention}"</p>
                     <button onClick={() => setInterventionOpen(true)} className="text-xs font-medium px-3 py-1 rounded-full active:scale-95 transition-all shrink-0 ml-3" style={{ backgroundColor: "#E8F8F7", color: "#2D7D6F", border: "1px solid #b3ecec" }}>
-                      Respond
+                      {t("dashboard.respond")}
                     </button>
                   </div>
                 </div>
@@ -272,9 +277,9 @@ export default function Dashboard() {
 
           <div className="grid md:grid-cols-3 gap-4 slide-up" style={{ animationDelay: "240ms" }}>
             {[
-              { icon: Clock, color: "text-secondary", label: "Pattern", text: "Most impulses occur between 13:00–22:00" },
-              { icon: BarChart3, color: "text-warning", label: "Correlation", text: "Stress peaks after inactivity > 2h" },
-              { icon: Flame, color: "text-warning", label: "Streak", text: "7 consecutive calm mornings", extra: <p className="text-2xl font-mono font-semibold text-primary mt-1 tabular-nums">7 🔥</p> },
+              { icon: Clock, color: "text-secondary", label: t("dashboard.pattern"), text: t("dashboard.patternText") },
+              { icon: BarChart3, color: "text-warning", label: t("dashboard.correlation"), text: t("dashboard.correlationText") },
+              { icon: Flame, color: "text-warning", label: t("dashboard.streak"), text: t("dashboard.streakText"), extra: <p className="text-2xl font-mono font-semibold text-primary mt-1 tabular-nums">7 🔥</p> },
             ].map(({ icon: Icon, color, label, text, extra }) => (
               <div key={label} className="rounded-xl p-5 card-shadow" style={{ backgroundColor: "hsl(276 33% 95%)", borderLeft: "2px solid hsl(284 16% 82%)" }}>
                 <div className="flex items-center gap-2 mb-2"><Icon size={16} className={color} /><span className="text-xs text-muted-foreground uppercase tracking-wide">{label}</span></div>
@@ -288,7 +293,7 @@ export default function Dashboard() {
         {watchOpen && (
           <div className="hidden lg:block w-[260px] shrink-0 border-l border-border/50 bg-card overflow-y-auto" style={{ animation: "slideInFromRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) both" }}>
             <div className="flex items-center justify-between p-4 pb-0">
-              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Watch Sim</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("dashboard.watchSim")}</span>
               <button onClick={() => setWatchOpen(false)} className="p-1 rounded hover:bg-muted transition-colors"><X size={14} className="text-muted-foreground" /></button>
             </div>
             <SmartWatchPanel onClose={() => setWatchOpen(false)} />
@@ -301,7 +306,7 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-black/30" onClick={() => setWatchOpen(false)} />
           <div className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto" style={{ animation: "slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1) both" }}>
             <div className="flex items-center justify-between p-4 pb-0">
-              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Watch Simulation</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("dashboard.watchSimMobile")}</span>
               <button onClick={() => setWatchOpen(false)} className="p-1 rounded hover:bg-muted transition-colors"><X size={16} className="text-muted-foreground" /></button>
             </div>
             <SmartWatchPanel onClose={() => setWatchOpen(false)} />

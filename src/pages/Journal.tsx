@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const EPISODE_TYPES = ["Binge", "Restriction", "Overeating", "Emotional eating", "Purge", "Other"];
 const TRIGGER_OPTIONS = ["Work stress", "Loneliness", "Fatigue", "Boredom", "Conflict", "Body image", "Social event", "Other"];
@@ -60,6 +61,7 @@ export default function Journal() {
   const { user } = useAuth();
   const { surveyTriggers } = useApp();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const [occurred, setOccurred] = useState("");
   const [episodeType, setEpisodeType] = useState("");
@@ -83,7 +85,7 @@ export default function Journal() {
 
   useEffect(() => {
     if (!triggersSeeded && surveyTriggers.length > 0) {
-      setTriggers(surveyTriggers.filter((t) => TRIGGER_OPTIONS.includes(t)));
+      setTriggers(surveyTriggers.filter((tr) => TRIGGER_OPTIONS.includes(tr)));
       setTriggersSeeded(true);
     }
   }, [surveyTriggers, triggersSeeded]);
@@ -115,7 +117,7 @@ export default function Journal() {
       overeating_occurred: episodeType === "Overeating" && occurred === "Yes",
       meal_skipped: episodeType === "Restriction" && occurred === "Yes",
       triggers: triggers.includes("Other") && otherTrigger
-        ? [...triggers.filter((t) => t !== "Other"), otherTrigger]
+        ? [...triggers.filter((tr) => tr !== "Other"), otherTrigger]
         : triggers,
       emotional_state: afterEmotions,
       notes: notes || null,
@@ -126,7 +128,7 @@ export default function Journal() {
       }),
     });
 
-    toast({ description: "Moment saved 💚", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+    toast({ description: t("journal.saved"), className: "bg-white border-l-2 border-l-[#b3ecec]" });
 
     const { data: fresh } = await supabase
       .from("self_reports")
@@ -137,7 +139,7 @@ export default function Journal() {
     if (fresh) setPastEntries(fresh as SelfReport[]);
 
     setOccurred(""); setEpisodeType(""); setOtherType(""); setIntensity(5);
-    setTriggers([]); setOtherTrigger(""); setAfterEmotions(""); setNotes("");
+    setTriggers([]); setOtherTrigger(""); setAfterEmotions([]); setNotes("");
     setSaving(false);
   };
 
@@ -145,7 +147,7 @@ export default function Journal() {
     const next = !current;
     setSharedMap((prev) => ({ ...prev, [id]: next }));
     await supabase.from("self_reports").update({ notes: pastEntries.find(e => e.id === id)?.notes ?? null } as never).eq("id", id);
-    toast({ description: next ? "Episode shared with your specialist." : "Episode unshared.", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+    toast({ description: next ? t("journal.shared") : t("journal.unshared"), className: "bg-white border-l-2 border-l-[#b3ecec]" });
   };
 
   const inputCls = "w-full px-4 py-2.5 rounded-xl border border-border/50 text-sm bg-white/70 focus:outline-none focus:ring-2 focus:ring-[#b3ecec]/50 focus:border-[#b3ecec] transition";
@@ -153,74 +155,67 @@ export default function Journal() {
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-8">
       <div className="slide-up">
-        <h1 className="text-2xl lg:text-3xl font-heading font-semibold">Journal</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Record what's happening. Every log helps PULZ understand you better.</p>
+        <h1 className="text-2xl lg:text-3xl font-heading font-semibold">{t("journal.title")}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">{t("journal.subtitle")}</p>
       </div>
 
-      {/* ── Episode logging form ── */}
       <div className="rounded-xl p-6 card-emotional space-y-6 slide-up" style={{ backgroundColor: "hsl(276 33% 95%)", animationDelay: "60ms" }}>
         <div className="flex items-center gap-2">
           <PenLine size={18} style={{ color: "hsl(280 20% 45%)" }} />
-          <h2 className="font-heading font-semibold text-base" style={{ color: "hsl(280 20% 45%)" }}>Log a moment</h2>
+          <h2 className="font-heading font-semibold text-base" style={{ color: "hsl(280 20% 45%)" }}>{t("journal.logMoment")}</h2>
         </div>
 
-        {/* Did an episode occur? */}
         <div className="space-y-2">
-          <label className="text-sm font-medium block">Did an episode occur?</label>
-          <Toggle value={occurred} options={["Yes", "No", "Unsure"]} onChange={setOccurred} />
+          <label className="text-sm font-medium block">{t("journal.episodeOccurred")}</label>
+          <Toggle value={occurred} options={[t("journal.yes"), t("journal.unsure")]} onChange={setOccurred} />
         </div>
 
-        {/* Episode type — only if occurred */}
-        {occurred === "Yes" && (
+        {occurred === t("journal.yes") && (
           <div className="space-y-2">
-            <label className="text-sm font-medium block">Episode type</label>
+            <label className="text-sm font-medium block">{t("journal.episodeType")}</label>
             <div className="flex flex-wrap gap-2">
-              {EPISODE_TYPES.map((t) => (
-                <Chip key={t} label={t} selected={episodeType === t} onToggle={() => setEpisodeType(episodeType === t ? "" : t)} />
+              {EPISODE_TYPES.map((ep) => (
+                <Chip key={ep} label={ep} selected={episodeType === ep} onToggle={() => setEpisodeType(episodeType === ep ? "" : ep)} />
               ))}
             </div>
             {episodeType === "Other" && (
-              <input value={otherType} onChange={(e) => setOtherType(e.target.value)} placeholder="Describe the episode…" className={inputCls} />
+              <input value={otherType} onChange={(e) => setOtherType(e.target.value)} placeholder={t("journal.describeEpisode")} className={inputCls} />
             )}
           </div>
         )}
 
-        {/* When did it happen? */}
         <div className="space-y-2">
-          <label className="text-sm font-medium block">When did it happen?</label>
+          <label className="text-sm font-medium block">{t("journal.whenHappened")}</label>
           <div className="flex gap-3">
             <input type="date" value={whenDate} onChange={(e) => setWhenDate(e.target.value)} className={`${inputCls} flex-1`} />
             <input type="time" value={whenTime} onChange={(e) => setWhenTime(e.target.value)} className={`${inputCls} w-32 font-mono`} />
           </div>
         </div>
 
-        {/* Intensity */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">How intense was it?</label>
+            <label className="text-sm font-medium">{t("journal.howIntense")}</label>
             <span className="text-xs font-mono text-muted-foreground tabular-nums">{intensity}/10</span>
           </div>
           <input type="range" min={0} max={10} value={intensity} onChange={(e) => setIntensity(Number(e.target.value))}
             className="w-full" style={{ accentColor: "#2D7D6F" }} />
-          <div className="flex justify-between text-[10px] text-muted-foreground"><span>Not at all</span><span>Overwhelming</span></div>
+          <div className="flex justify-between text-[10px] text-muted-foreground"><span>{t("journal.notAtAll")}</span><span>{t("journal.overwhelming")}</span></div>
         </div>
 
-        {/* Triggers */}
         <div className="space-y-2">
-          <label className="text-sm font-medium block">What triggered it?</label>
+          <label className="text-sm font-medium block">{t("journal.whatTriggered")}</label>
           <div className="flex flex-wrap gap-2">
-            {TRIGGER_OPTIONS.map((t) => (
-              <Chip key={t} label={t} selected={triggers.includes(t)} onToggle={() => toggleArr(triggers, setTriggers, t)} />
+            {TRIGGER_OPTIONS.map((tr) => (
+              <Chip key={tr} label={tr} selected={triggers.includes(tr)} onToggle={() => toggleArr(triggers, setTriggers, tr)} />
             ))}
           </div>
           {triggers.includes("Other") && (
-            <input value={otherTrigger} onChange={(e) => setOtherTrigger(e.target.value)} placeholder="Describe the trigger…" className={inputCls} />
+            <input value={otherTrigger} onChange={(e) => setOtherTrigger(e.target.value)} placeholder={t("journal.describeTrigger")} className={inputCls} />
           )}
         </div>
 
-        {/* How do you feel now? */}
         <div className="space-y-2">
-          <label className="text-sm font-medium block">How do you feel now?</label>
+          <label className="text-sm font-medium block">{t("journal.howFeel")}</label>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {EMOTIONS.map((e) => (
               <button key={e} type="button" onClick={() => toggleArr(afterEmotions, setAfterEmotions, e)}
@@ -234,31 +229,29 @@ export default function Journal() {
           </div>
         </div>
 
-        {/* Notes */}
         <div className="space-y-2">
-          <label className="text-sm font-medium block">Notes <span className="text-muted-foreground font-normal">(optional)</span></label>
+          <label className="text-sm font-medium block">{t("journal.notes")} <span className="text-muted-foreground font-normal">{t("journal.optional")}</span></label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anything else you want to capture…"
+            placeholder={t("journal.anythingElse")}
             className={`${inputCls} min-h-[80px] resize-y`} />
         </div>
 
         <button onClick={handleSave} disabled={!occurred || saving}
           className="w-full py-3 rounded-xl font-medium text-sm text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
           style={{ backgroundColor: "#2D7D6F" }}>
-          {saving ? "Saving…" : "Save this moment"}
+          {saving ? t("journal.saving") : t("journal.saveButton")}
         </button>
       </div>
 
-      {/* ── Past entries ── */}
       {pastEntries.length > 0 && (
         <div className="space-y-3 slide-up" style={{ animationDelay: "120ms" }}>
-          <h2 className="text-lg font-heading font-semibold">Recent entries</h2>
+          <h2 className="text-lg font-heading font-semibold">{t("journal.recentEntries")}</h2>
           {pastEntries.map((entry) => {
             const ctx = parseContext(entry.location_context);
             const isShared = sharedMap[entry.id] ?? false;
             const ts = new Date(entry.timestamp);
             const label = ctx.episode_type ?? (entry.binge_occurred ? "Binge" : entry.purge_occurred ? "Purge" : entry.overeating_occurred ? "Overeating" : entry.meal_skipped ? "Restriction" : "Moment");
-            const occurred = ctx.occurred ?? "—";
+            const occ = ctx.occurred ?? "—";
 
             return (
               <div key={entry.id} className="rounded-xl overflow-hidden card-emotional" style={{ backgroundColor: "hsl(276 33% 95%)" }}>
@@ -269,7 +262,7 @@ export default function Journal() {
                       {ts.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} · {ts.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                     <span className="chip-trigger px-2 py-0.5 rounded-full text-xs shrink-0">{label}</span>
-                    <span className="text-xs text-muted-foreground truncate">{occurred}</span>
+                    <span className="text-xs text-muted-foreground truncate">{occ}</span>
                   </div>
                   <ChevronDown size={16} className={`text-muted-foreground shrink-0 transition-transform ${expandedEntry === entry.id ? "rotate-180" : ""}`} />
                 </button>
@@ -278,7 +271,7 @@ export default function Journal() {
                   <div className="px-4 pb-4 pt-0 border-t border-border/50 space-y-3">
                     {entry.urge_level != null && (
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-20 shrink-0">Intensity</span>
+                        <span className="text-xs text-muted-foreground w-20 shrink-0">{t("journal.intensity")}</span>
                         <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                           <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${entry.urge_level * 10}%` }} />
                         </div>
@@ -287,23 +280,22 @@ export default function Journal() {
                     )}
                     {entry.triggers && entry.triggers.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
-                        <span className="text-xs text-muted-foreground w-20 shrink-0 pt-0.5">Triggers</span>
-                        {entry.triggers.map((t) => <span key={t} className="chip-trigger px-2 py-0.5 rounded-full text-xs">{t}</span>)}
+                        <span className="text-xs text-muted-foreground w-20 shrink-0 pt-0.5">{t("journal.triggers")}</span>
+                        {entry.triggers.map((tr) => <span key={tr} className="chip-trigger px-2 py-0.5 rounded-full text-xs">{tr}</span>)}
                       </div>
                     )}
                     {entry.emotional_state && entry.emotional_state.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
-                        <span className="text-xs text-muted-foreground w-20 shrink-0 pt-0.5">Feeling</span>
-                        {entry.emotional_state.map((e) => <span key={e} className="chip-biometric px-2 py-0.5 rounded-full text-xs">{e}</span>)}
+                        <span className="text-xs text-muted-foreground w-20 shrink-0 pt-0.5">{t("journal.feeling")}</span>
+                        {entry.emotional_state.map((em) => <span key={em} className="chip-biometric px-2 py-0.5 rounded-full text-xs">{em}</span>)}
                       </div>
                     )}
                     {entry.notes && <p className="text-sm text-muted-foreground italic">"{entry.notes}"</p>}
 
-                    {/* Share with specialist toggle */}
                     <div className="flex items-center justify-between pt-2 border-t border-border/40">
                       <div className="flex items-center gap-2">
                         {isShared ? <UserCheck size={14} style={{ color: "#2D7D6F" }} /> : <Share2 size={14} className="text-muted-foreground" />}
-                        <span className="text-xs font-medium text-muted-foreground">Share with my specialist</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("journal.shareSpecialist")}</span>
                       </div>
                       <button type="button" onClick={() => toggleShare(entry.id, isShared)}
                         className="relative w-10 h-5 rounded-full transition-colors duration-200"

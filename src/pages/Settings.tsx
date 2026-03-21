@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User, Bell, Shield, SlidersHorizontal, Copy, Trash2, Download, AlertTriangle, ClipboardList } from "lucide-react";
+import { User, Bell, Shield, SlidersHorizontal, Trash2, Download, AlertTriangle, ClipboardList } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,12 +22,11 @@ const DEFAULT_PREFS = {
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted, appLoading } = useApp();
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const { t, language, setLanguage } = useLanguage();
 
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
   const [device, setDevice] = useState<{ deviceType: string; lastSync: string | null; isActive: boolean | null } | null>(null);
-  const [specialistName, setSpecialistName] = useState<string | null>(null);
 
   const [deleteModal, setDeleteModal] = useState(false);
   const notifs = {
@@ -93,7 +92,7 @@ export default function SettingsPage() {
     let cancelled = false;
 
     const load = async () => {
-      const [profileRes, deviceRes, cpRes] = await Promise.all([
+      const [profileRes, deviceRes] = await Promise.all([
         supabase.from("profiles").select("notification_preferences, theme_preference").eq("user_id", user.id).maybeSingle(),
         supabase
           .from("device_connections")
@@ -102,9 +101,6 @@ export default function SettingsPage() {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
-        role === "client"
-          ? supabase.from("client_profiles").select("assigned_specialist_id").eq("id", user.id).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
       ]);
 
       if (cancelled) return;
@@ -132,26 +128,13 @@ export default function SettingsPage() {
       } else {
         setDevice(null);
       }
-
-      if (role === "client" && cpRes.data?.assigned_specialist_id) {
-        const { data: specialistProfile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("user_id", cpRes.data.assigned_specialist_id)
-          .maybeSingle();
-        if (!cancelled) {
-          setSpecialistName(specialistProfile?.full_name ?? null);
-        }
-      } else {
-        setSpecialistName(null);
-      }
     };
 
     load();
     return () => {
       cancelled = true;
     };
-  }, [user, role]);
+  }, [user]);
 
   const age = (() => {
     if (!dateOfBirth) return null;
@@ -195,7 +178,6 @@ export default function SettingsPage() {
   const deviceConnected = device?.isActive ?? false;
   const deviceName = device?.deviceType ?? "No device connected";
   const lastSyncLabel = device?.lastSync ? new Date(device.lastSync).toLocaleString() : "—";
-  const hasSpecialist = Boolean(specialistName);
 
   if (appLoading) {
     return (
@@ -259,7 +241,7 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-2">Started {joinedWeeksAgo} {t("settings.personalData.weeksAgo")}</p>
+            <p className="text-xs text-muted-foreground mt-2">{t("settings.startedLabel")} {joinedWeeksAgo} {t("settings.personalData.weeksAgo")}</p>
           </div>
         </div>
       </div>
@@ -273,8 +255,8 @@ export default function SettingsPage() {
         >
           <ClipboardList size={18} style={{ color: "#B45309" }} />
           <div className="min-w-0">
-            <p className="text-sm font-medium" style={{ color: "#B45309" }}>Complete your health profile</p>
-            <p className="text-xs text-muted-foreground">Finish the setup survey so PULZ can personalise your experience.</p>
+            <p className="text-sm font-medium" style={{ color: "#B45309" }}>{t("settings.completeHealthProfile")}</p>
+            <p className="text-xs text-muted-foreground">{t("settings.completeHealthProfileDesc")}</p>
           </div>
         </button>
       )}
@@ -282,20 +264,20 @@ export default function SettingsPage() {
       {/* ─── DEVICE CARD ─── */}
       <div className="bg-card rounded-xl p-6 card-physiological slide-up" style={{ animationDelay: "120ms" }}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-heading font-semibold text-base">Connected Device</h3>
+          <h3 className="font-heading font-semibold text-base">{t("settings.device")}</h3>
           <span className={`text-sm font-medium ${deviceConnected ? "text-success" : "text-muted-foreground"}`}>
-            {deviceConnected ? `${deviceName} ✅` : deviceName}
+            {deviceConnected ? `${deviceName} ✅` : t("settings.noDevice")}
           </span>
         </div>
         <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
-          <span>Last sync: {lastSyncLabel}</span>
-          <span>Battery: —</span>
+          <span>{t("settings.lastSync")}: {lastSyncLabel}</span>
+          <span>{t("settings.battery")}: —</span>
         </div>
         <div className="flex flex-wrap gap-1.5 mb-5">
           {deviceConnected ? (
-            <span className="chip-biometric px-2.5 py-1 rounded-full text-xs">Sync active</span>
+            <span className="chip-biometric px-2.5 py-1 rounded-full text-xs">{t("settings.syncActive")}</span>
           ) : (
-            <span className="text-xs text-muted-foreground">No device data yet</span>
+            <span className="text-xs text-muted-foreground">{t("settings.noDeviceData")}</span>
           )}
         </div>
         <div className="flex gap-3">
@@ -304,27 +286,27 @@ export default function SettingsPage() {
             className="px-4 py-2 rounded-xl text-sm font-medium active:scale-95 transition-transform"
             style={{ backgroundColor: "#b3ecec", color: "#1A4040", opacity: deviceConnected ? 1 : 0.6 }}
           >
-            Sync now
+            {t("settings.syncNow")}
           </button>
           <button
             disabled={!deviceConnected}
             className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95"
             style={{ opacity: deviceConnected ? 1 : 0.6 }}
           >
-            Disconnect device
+            {t("settings.disconnectDevice")}
           </button>
         </div>
       </div>
 
       {/* ─── NOTIFICATIONS CARD ─── */}
       <div className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-1 slide-up" style={{ animationDelay: "180ms" }}>
-        <h3 className="font-heading font-semibold text-base mb-4">Notifications</h3>
+        <h3 className="font-heading font-semibold text-base mb-4">{t("settings.notifications")}</h3>
 
         {/* Intervention alerts */}
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <AlertTriangle size={18} className="text-muted-foreground" />
-            <span className="text-sm">Intervention alerts</span>
+            <span className="text-sm">{t("settings.interventionAlerts")}</span>
           </div>
           <Toggle on={notifs.interventions} onToggle={() => updatePrefs({ interventions: !notifs.interventions })} />
         </div>
@@ -333,7 +315,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <Bell size={18} className="text-muted-foreground" />
-            <span className="text-sm">Daily check-in reminder</span>
+            <span className="text-sm">{t("settings.dailyCheckin")}</span>
           </div>
           <div className="flex items-center gap-2">
             {notifs.dailyCheckin && (
@@ -352,7 +334,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <Download size={18} className="text-muted-foreground" />
-            <span className="text-sm">Weekly summary</span>
+            <span className="text-sm">{t("settings.weeklySummary")}</span>
           </div>
           <Toggle on={notifs.weeklySummary} onToggle={() => updatePrefs({ weeklySummary: !notifs.weeklySummary })} />
         </div>
@@ -361,7 +343,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <User size={18} className="text-muted-foreground" />
-            <span className="text-sm">Specialist messages</span>
+            <span className="text-sm">{t("settings.specialistMessages")}</span>
           </div>
           <Toggle on={notifs.specialistMsg} onToggle={() => updatePrefs({ specialistMsg: !notifs.specialistMsg })} />
         </div>
@@ -370,7 +352,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <Bell size={18} className="text-muted-foreground" />
-            <span className="text-sm">Sound</span>
+            <span className="text-sm">{t("settings.soundLabel")}</span>
           </div>
           <Toggle on={personalisation.soundEnabled} onToggle={() => updatePersonalisation({ soundEnabled: !personalisation.soundEnabled })} />
         </div>
@@ -379,27 +361,27 @@ export default function SettingsPage() {
           className="mt-2 rounded-xl px-4 py-3 text-xs"
           style={{ backgroundColor: "#EEF3FB", color: "#4A5568" }}
         >
-          PULZ notifications are always on to keep you safe. For concerns about notification frequency, speak with your specialist.
+          {t("settings.notificationsNote")}
         </div>
       </div>
 
       {/* ─── PRIVACY CARD ─── */}
       <div className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-5 slide-up" style={{ animationDelay: "240ms" }}>
-        <h3 className="font-heading font-semibold text-base">Privacy & Data</h3>
+        <h3 className="font-heading font-semibold text-base">{t("settings.privacy")}</h3>
 
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: "#E8F8F7", color: "#2D7D6F" }}>
           <Shield size={14} />
-          Local processing only ✅
+          {t("settings.localProcessing")}
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Data retention</label>
+          <label className="text-sm font-medium">{t("settings.dataRetention")}</label>
           <PillRadio options={["30 days", "60 days", "90 days"]} value={retention} onChange={(v) => updatePrefs({ retention: v })} />
         </div>
 
         <button className="w-full py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center justify-center gap-2">
           <Download size={16} />
-          Export my data as CSV
+          {t("settings.exportData")}
         </button>
 
         <button
@@ -407,48 +389,14 @@ export default function SettingsPage() {
           className="text-sm font-medium hover:underline transition-all active:scale-95"
           style={{ color: "#F87171" }}
         >
-          Delete all data
+          {t("settings.deleteData")}
         </button>
-      </div>
-
-      {/* ─── SPECIALIST CARD ─── */}
-      <div className="bg-card rounded-xl p-6 card-emotional space-y-5 slide-up" style={{ animationDelay: "300ms" }}>
-        <h3 className="font-heading font-semibold text-base">Specialist</h3>
-        <p className="text-sm text-muted-foreground">
-          {hasSpecialist ? specialistName : "No specialist assigned"}
-        </p>
-
-        <div className="space-y-1">
-          {(["episodes", "journal", "biometrics"] as const).map((key) => (
-            <div key={key} className="flex items-center justify-between py-2">
-              <span className="text-sm capitalize">{key}</span>
-              <Toggle
-                on={sharing[key]}
-                onToggle={() => hasSpecialist && updatePrefs({ sharing: { ...sharing, [key]: !sharing[key] } })}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            disabled={!hasSpecialist}
-            className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95"
-            style={{ opacity: hasSpecialist ? 1 : 0.6 }}
-          >
-            Disconnect specialist
-          </button>
-          <button className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center gap-1.5">
-            <Copy size={14} />
-            Invite new specialist
-          </button>
-        </div>
       </div>
 
       {/* ─── CRISIS CONTACT CARD ─── */}
       {(personalisation.crisisContactName || personalisation.crisisContactPhone) && (
         <div className="rounded-xl p-6 card-shadow slide-up" style={{ backgroundColor: "#FFF5F5", border: "1px solid #FECACA", animationDelay: "330ms" }}>
-          <h3 className="font-heading font-semibold text-base mb-3">Crisis Contact</h3>
+          <h3 className="font-heading font-semibold text-base mb-3">{t("settings.crisisContact")}</h3>
           <div className="space-y-1">
             {personalisation.crisisContactName && (
               <p className="text-sm font-medium">{personalisation.crisisContactName}</p>
@@ -461,14 +409,14 @@ export default function SettingsPage() {
             onClick={() => navigate("/personalise")}
             className="mt-3 text-xs text-muted-foreground hover:underline"
           >
-            Edit in Personalise →
+            {t("settings.editPersonalise")}
           </button>
         </div>
       )}
 
       {/* ─── APPEARANCE CARD ─── */}
       <div className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-5 slide-up" style={{ animationDelay: "360ms" }}>
-        <h3 className="font-heading font-semibold text-base">Appearance</h3>
+        <h3 className="font-heading font-semibold text-base">{t("settings.appearance")}</h3>
 
         {/* Link to Personalise */}
         <button
@@ -478,17 +426,17 @@ export default function SettingsPage() {
         >
           <SlidersHorizontal size={18} style={{ color: "#2D7D6F" }} />
           <span className="text-sm font-medium" style={{ color: "#2D7D6F" }}>
-            Full theme & colour settings →
+            {t("settings.themeSettings")}
           </span>
         </button>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Theme</label>
+          <label className="text-sm font-medium">{t("settings.theme")}</label>
           <PillRadio options={["Light", "Dark", "System"]} value={theme} onChange={(v) => updatePrefs({ theme: v })} />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Language</label>
+          <label className="text-sm font-medium">{t("settings.language")}</label>
           <select
             value={language}
             onChange={(e) => {
@@ -499,13 +447,11 @@ export default function SettingsPage() {
           >
             <option value="en">English</option>
             <option value="ro">Română</option>
-            <option value="fr">Français</option>
-            <option value="es">Español</option>
           </select>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Font size</label>
+          <label className="text-sm font-medium">{t("settings.fontSize")}</label>
           <PillRadio options={["Default", "Large"]} value={fontSize} onChange={(v) => updatePrefs({ fontSize: v })} />
         </div>
       </div>
@@ -522,23 +468,23 @@ export default function SettingsPage() {
               <div className="p-2 rounded-lg bg-destructive/10">
                 <Trash2 size={18} className="text-destructive" />
               </div>
-              <h3 className="font-heading font-semibold">Delete all data?</h3>
+              <h3 className="font-heading font-semibold">{t("settings.deleteModal.title")}</h3>
             </div>
             <p className="text-sm text-muted-foreground">
-              This will permanently delete all your episodes, journal entries, and progress data. This action cannot be undone.
+              {t("settings.deleteModal.body")}
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setDeleteModal(false)}
                 className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95"
               >
-                Cancel
+                {t("settings.deleteModal.cancel")}
               </button>
               <button
                 onClick={() => setDeleteModal(false)}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-destructive hover:bg-destructive/90 transition-colors active:scale-95"
               >
-                Delete everything
+                {t("settings.deleteModal.confirm")}
               </button>
             </div>
           </div>

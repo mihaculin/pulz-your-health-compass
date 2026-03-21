@@ -1,7 +1,19 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) navigate("/dashboard", { replace: true });
+    };
+    check();
+  }, [navigate]);
 
   return (
     <div
@@ -15,7 +27,7 @@ export default function Welcome() {
           PULZ
         </h1>
         <p className="text-lg italic font-heading text-muted-foreground">
-          The space between impulse and action.
+          {t("welcome.tagline")}
         </p>
 
         <div className="flex flex-col gap-3 w-full max-w-xs mx-auto pt-4">
@@ -24,19 +36,19 @@ export default function Welcome() {
             className="w-full py-3 rounded-2xl font-medium text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: "hsl(var(--primary))" }}
           >
-            Create account
+            {t("welcome.createAccount")}
           </button>
           <button
             onClick={() => navigate("/signin")}
             className="w-full py-3 rounded-2xl font-medium border-2 transition-all hover:bg-muted/50 active:scale-[0.98]"
             style={{ borderColor: "hsl(var(--primary))", color: "hsl(var(--primary))" }}
           >
-            Sign in
+            {t("welcome.signIn")}
           </button>
         </div>
 
         <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed pt-4">
-          PULZ provides wellness insights only and does not diagnose or treat medical or psychiatric conditions.
+          {t("welcome.disclaimer")}
         </p>
       </div>
     </div>

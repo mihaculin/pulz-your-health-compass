@@ -23,7 +23,7 @@ function LoadingScreen() {
 }
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, role, loading } = useAuth();
+  const { user, loading } = useAuth();
   const { appLoading, intakeSurveyCompleted } = useApp();
   const location = useLocation();
 
@@ -32,13 +32,12 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) return <Navigate to="/" replace />;
 
   const atOnboarding = location.pathname === "/onboarding";
-  const destination = role === "specialist" ? "/specialist/dashboard" : "/dashboard";
 
   if (atOnboarding && intakeSurveyCompleted) {
-    return <Navigate to={destination} replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
-  if (!atOnboarding && role === "client" && !intakeSurveyCompleted) {
+  if (!atOnboarding && !intakeSurveyCompleted) {
     return <Navigate to="/onboarding" replace />;
   }
 

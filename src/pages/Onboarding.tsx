@@ -6,6 +6,8 @@ import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { THEMES } from "@/lib/theme";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
+import translations from "@/translations";
 
 const TOTAL_STEPS = 7;
 
@@ -98,12 +100,14 @@ function Chip({ label, selected, onToggle }: { label: string; selected: boolean;
   );
 }
 
-function SliderRow({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+type Tf = (key: string) => string;
+
+function SliderRow({ label, value, onChange, rarely, often }: { label: string; value: number; onChange: (v: number) => void; rarely: string; often: string }) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between"><span className="text-sm font-medium">{label}</span><span className="text-xs font-mono text-muted-foreground">{value}/10</span></div>
       <input type="range" min={1} max={10} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{ accentColor: "#b3ecec" }} />
-      <div className="flex justify-between text-[10px] text-muted-foreground"><span>Rarely</span><span>Often</span></div>
+      <div className="flex justify-between text-[10px] text-muted-foreground"><span>{rarely}</span><span>{often}</span></div>
     </div>
   );
 }
@@ -129,6 +133,9 @@ export default function Onboarding() {
   const { updatePersonalisation, markIntakeSurveyCompleted, refreshProfile } = useApp();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, language } = useLanguage();
+
+  const stepLabels = translations[language].onboarding.stepLabels as readonly string[];
 
   const update = <K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) =>
     setData((prev) => ({ ...prev, [key]: value }));
@@ -220,39 +227,37 @@ export default function Onboarding() {
     }
   };
 
-  const stepLabels = ["About you", "Food relationship", "Emotional patterns", "Physical health", "Connect device", "Personalise", "Safety setup"];
-
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "hsl(var(--background))" }}>
       <div className="w-full max-w-lg mx-auto flex flex-col flex-1 px-6 py-8">
         <div className="space-y-3 mb-8">
           <div className="flex items-center justify-between">
             <span className="text-xl font-heading font-semibold" style={{ color: "hsl(var(--primary))" }}>PULZ</span>
-            <p className="text-xs text-muted-foreground">Step {step} of {TOTAL_STEPS} — <span className="font-medium text-foreground">{stepLabels[step - 1]}</span></p>
+            <p className="text-xs text-muted-foreground">{t("onboarding.stepOf")} {step} {t("onboarding.of")} {TOTAL_STEPS} — <span className="font-medium text-foreground">{stepLabels[step - 1]}</span></p>
           </div>
           <ProgressBar step={step} />
         </div>
 
         <div className="flex-1 slide-up" key={step}>
-          {step === 1 && <Step1 data={data} update={update} />}
-          {step === 2 && <Step2 data={data} toggle={toggle} />}
-          {step === 3 && <Step3 data={data} update={update} toggle={toggle} />}
-          {step === 4 && <Step4 data={data} update={update} toggle={toggle} />}
-          {step === 5 && <Step5 data={data} update={update} />}
-          {step === 6 && <Step6 data={data} update={update} />}
-          {step === 7 && <Step7 data={data} update={update} />}
+          {step === 1 && <Step1 data={data} update={update} t={t} />}
+          {step === 2 && <Step2 data={data} toggle={toggle} t={t} />}
+          {step === 3 && <Step3 data={data} update={update} toggle={toggle} t={t} />}
+          {step === 4 && <Step4 data={data} update={update} toggle={toggle} t={t} />}
+          {step === 5 && <Step5 data={data} update={update} t={t} />}
+          {step === 6 && <Step6 data={data} update={update} t={t} />}
+          {step === 7 && <Step7 data={data} update={update} t={t} />}
         </div>
 
         <div className="flex items-center justify-between pt-8 mt-auto">
           {step > 1 ? (
             <button onClick={() => setStep((s) => s - 1)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronLeft size={16} /> Back
+              <ChevronLeft size={16} /> {t("common.back")}
             </button>
           ) : <div />}
           <button onClick={next} disabled={!canAdvance() || saving}
             className="flex items-center gap-2 px-6 py-3 rounded-2xl font-medium text-sm text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
             style={{ backgroundColor: "hsl(var(--primary))" }}>
-            {saving ? "Saving…" : step === TOTAL_STEPS ? "Finish" : "Continue"}
+            {saving ? t("onboarding.saving") : step === TOTAL_STEPS ? t("common.finish") : t("common.continue")}
             {!saving && step < TOTAL_STEPS && <ChevronRight size={16} />}
             {!saving && step === TOTAL_STEPS && <Check size={16} />}
           </button>
@@ -262,13 +267,13 @@ export default function Onboarding() {
   );
 }
 
-function Step1({ data, update }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void }) {
+function Step1({ data, update, t }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; t: Tf }) {
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">About you</h2><p className="text-sm text-muted-foreground">This helps PULZ personalise your health insights.</p></div>
+      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step1Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step1Desc")}</p></div>
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Date of birth</label>
+          <label className="text-sm font-medium">{t("onboarding.dateOfBirth")}</label>
           <input
             type="text"
             value={data.dob}
@@ -285,11 +290,11 @@ function Step1({ data, update }: { data: OnboardingData; update: <K extends keyo
           />
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between"><label className="text-sm font-medium">Height</label><UnitToggle value={data.heightUnit} options={["cm", "ft"]} onChange={(v) => update("heightUnit", v as HeightUnit)} /></div>
+          <div className="flex items-center justify-between"><label className="text-sm font-medium">{t("onboarding.height")}</label><UnitToggle value={data.heightUnit} options={["cm", "ft"]} onChange={(v) => update("heightUnit", v as HeightUnit)} /></div>
           <input type="number" value={data.height} onChange={(e) => update("height", e.target.value)} placeholder={data.heightUnit === "cm" ? "e.g. 165" : "e.g. 5.5"} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between"><label className="text-sm font-medium">Weight</label><UnitToggle value={data.weightUnit} options={["kg", "lbs"]} onChange={(v) => update("weightUnit", v as WeightUnit)} /></div>
+          <div className="flex items-center justify-between"><label className="text-sm font-medium">{t("onboarding.weight")}</label><UnitToggle value={data.weightUnit} options={["kg", "lbs"]} onChange={(v) => update("weightUnit", v as WeightUnit)} /></div>
           <input type="number" value={data.weight} onChange={(e) => update("weight", e.target.value)} placeholder={data.weightUnit === "kg" ? "e.g. 62" : "e.g. 137"} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
         </div>
       </div>
@@ -297,42 +302,42 @@ function Step1({ data, update }: { data: OnboardingData; update: <K extends keyo
   );
 }
 
-function Step2({ data, toggle }: { data: OnboardingData; toggle: (k: "foodConcerns" | "triggers" | "conditions", item: string) => void }) {
+function Step2({ data, toggle, t }: { data: OnboardingData; toggle: (k: "foodConcerns" | "triggers" | "conditions", item: string) => void; t: Tf }) {
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">Your relationship with food</h2><p className="text-sm text-muted-foreground">Select all that feel relevant. There's no wrong answer.</p></div>
+      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step2Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step2Desc")}</p></div>
       <div className="flex flex-wrap gap-2">{FOOD_CONCERNS.map((c) => <Chip key={c} label={c} selected={data.foodConcerns.includes(c)} onToggle={() => toggle("foodConcerns", c)} />)}</div>
       <div className="rounded-2xl p-4 text-sm text-muted-foreground" style={{ backgroundColor: "hsl(var(--color-lavender-mist))", borderLeft: "3px solid hsl(var(--color-lavender))" }}>
-        Your answers shape the insights PULZ surfaces — not labels. You can update these any time in Settings.
+        {t("onboarding.foodInfo")}
       </div>
     </div>
   );
 }
 
-function Step3({ data, update, toggle }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; toggle: (k: "foodConcerns" | "triggers" | "conditions", item: string) => void }) {
+function Step3({ data, update, toggle, t }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; toggle: (k: "foodConcerns" | "triggers" | "conditions", item: string) => void; t: Tf }) {
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">Emotional patterns</h2><p className="text-sm text-muted-foreground">How often do you experience the following?</p></div>
+      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step3Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step3Desc")}</p></div>
       <div className="space-y-5">
         {Object.entries(data.emotionSliders).map(([label, value]) => (
-          <SliderRow key={label} label={label} value={value} onChange={(v) => update("emotionSliders", { ...data.emotionSliders, [label]: v })} />
+          <SliderRow key={label} label={label} value={value} rarely={t("onboarding.rarely")} often={t("onboarding.often")} onChange={(v) => update("emotionSliders", { ...data.emotionSliders, [label]: v })} />
         ))}
       </div>
       <div className="space-y-3">
-        <label className="text-sm font-medium block">Common triggers</label>
-        <div className="flex flex-wrap gap-2">{TRIGGERS.map((t) => <Chip key={t} label={t} selected={data.triggers.includes(t)} onToggle={() => toggle("triggers", t)} />)}</div>
+        <label className="text-sm font-medium block">{t("onboarding.commonTriggers")}</label>
+        <div className="flex flex-wrap gap-2">{TRIGGERS.map((tr) => <Chip key={tr} label={tr} selected={data.triggers.includes(tr)} onToggle={() => toggle("triggers", tr)} />)}</div>
       </div>
     </div>
   );
 }
 
-function Step4({ data, update, toggle }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; toggle: (k: "foodConcerns" | "triggers" | "conditions", item: string) => void }) {
+function Step4({ data, update, toggle, t }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; toggle: (k: "foodConcerns" | "triggers" | "conditions", item: string) => void; t: Tf }) {
   const otherSelected = data.conditions.includes("Other");
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">Physical health</h2><p className="text-sm text-muted-foreground">Helps PULZ contextualise your physiological patterns.</p></div>
+      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step4Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step4Desc")}</p></div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Do any of these apply to you?</label>
+        <label className="text-sm font-medium">{t("onboarding.doAnyApply")}</label>
         <div className="grid grid-cols-2 gap-2">
           {CONDITIONS.map((c) => (
             <button key={c} type="button" onClick={() => toggle("conditions", c)} className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border-2 text-sm text-left transition-all"
@@ -342,30 +347,22 @@ function Step4({ data, update, toggle }: { data: OnboardingData; update: <K exte
           ))}
         </div>
         {otherSelected && (
-          <input
-            type="text"
-            value={data.otherCondition}
-            onChange={(e) => update("otherCondition", e.target.value)}
-            placeholder="Please describe your condition…"
-            autoFocus
-            className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none transition-all"
-            style={{ borderColor: "#b3ecec" }}
-          />
+          <input type="text" value={data.otherCondition} onChange={(e) => update("otherCondition", e.target.value)} placeholder={t("onboarding.describeCondition")} autoFocus className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none transition-all" style={{ borderColor: "#b3ecec" }} />
         )}
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Specialist code <span className="text-muted-foreground font-normal">(optional)</span></label>
-        <p className="text-xs text-muted-foreground">If your therapist or dietitian gave you a code, enter it here.</p>
-        <input type="text" value={data.specialistCode} onChange={(e) => update("specialistCode", e.target.value)} placeholder="e.g. DR-SMITH-4291" className="w-full px-4 py-3 rounded-2xl border text-sm bg-card font-mono focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
+        <label className="text-sm font-medium">{t("onboarding.specialistCode")} <span className="text-muted-foreground font-normal">{t("common.optional")}</span></label>
+        <p className="text-xs text-muted-foreground">{t("onboarding.specialistCodeDesc")}</p>
+        <input type="text" value={data.specialistCode} onChange={(e) => update("specialistCode", e.target.value)} placeholder={t("onboarding.specialistCodePlaceholder")} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card font-mono focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
       </div>
     </div>
   );
 }
 
-function Step5({ data, update }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void }) {
+function Step5({ data, update, t }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; t: Tf }) {
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">Connect a device</h2><p className="text-sm text-muted-foreground">PULZ uses real-time biometric data to detect stress and impulse patterns.</p></div>
+      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step5Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step5Desc")}</p></div>
       <div className="grid grid-cols-2 gap-3">
         {DEVICES.map(({ id, label, icon: Icon, color }) => {
           const selected = data.connectedDevice === id;
@@ -377,55 +374,55 @@ function Step5({ data, update }: { data: OnboardingData; update: <K extends keyo
                 <Icon size={24} style={{ color: selected ? "#1A4040" : color }} />
               </div>
               <span className="text-sm font-medium" style={{ color: selected ? "#1A4040" : "hsl(var(--foreground))" }}>{label}</span>
-              {selected && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.6)", color: "#1A4040" }}>Connected</span>}
+              {selected && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.6)", color: "#1A4040" }}>{t("onboarding.connected")}</span>}
             </button>
           );
         })}
       </div>
       <button type="button" onClick={() => update("connectedDevice", null)} className="w-full py-3 rounded-2xl text-sm text-muted-foreground border border-dashed transition-colors hover:text-foreground" style={{ borderColor: "hsl(var(--border))" }}>
-        Skip for now — I'll connect later
+        {t("onboarding.skipDevice")}
       </button>
     </div>
   );
 }
 
-function Step6({ data, update }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void }) {
+function Step6({ data, update, t }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; t: Tf }) {
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">Personalise your PULZ</h2><p className="text-sm text-muted-foreground">Make it feel like yours.</p></div>
+      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step6Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step6Desc")}</p></div>
       <div className="space-y-3">
-        <label className="text-sm font-medium">Colour theme</label>
+        <label className="text-sm font-medium">{t("onboarding.colorTheme")}</label>
         <div className="grid grid-cols-2 gap-3">
-          {THEMES.map((t) => (
-            <button key={t.id} type="button" onClick={() => update("theme", t.id)}
+          {THEMES.map((th) => (
+            <button key={th.id} type="button" onClick={() => update("theme", th.id)}
               className="rounded-xl overflow-hidden transition-all active:scale-[0.97]"
-              style={data.theme === t.id ? { outline: "3px solid hsl(var(--primary))", outlineOffset: "2px" } : { outline: "1px solid hsl(var(--border))" }}>
-              <div className="h-16 w-full" style={{ background: `linear-gradient(135deg, ${t.aqua}, ${t.lavender})` }} />
+              style={data.theme === th.id ? { outline: "3px solid hsl(var(--primary))", outlineOffset: "2px" } : { outline: "1px solid hsl(var(--border))" }}>
+              <div className="h-16 w-full" style={{ background: `linear-gradient(135deg, ${th.aqua}, ${th.lavender})` }} />
               <div className="p-2.5 text-left flex items-center justify-between">
-                <div><p className="text-sm font-medium">{t.name}</p><p className="text-xs text-muted-foreground">{t.sub}</p></div>
-                {data.theme === t.id && <Check size={14} className="text-primary shrink-0" />}
+                <div><p className="text-sm font-medium">{th.name}</p><p className="text-xs text-muted-foreground">{th.sub}</p></div>
+                {data.theme === th.id && <Check size={14} className="text-primary shrink-0" />}
               </div>
             </button>
           ))}
         </div>
       </div>
       <div className="space-y-3">
-        <label className="text-sm font-medium">Communication tone</label>
+        <label className="text-sm font-medium">{t("onboarding.communicationTone")}</label>
         <div className="space-y-2">
-          {(["gentle", "direct", "clinical"] as Tone[]).map((t) => (
-            <button key={t} type="button" onClick={() => update("tone", t)}
+          {(["gentle", "direct", "clinical"] as Tone[]).map((tone) => (
+            <button key={tone} type="button" onClick={() => update("tone", tone)}
               className="w-full flex items-start gap-3 px-4 py-3.5 rounded-2xl border-2 text-left transition-all"
-              style={data.tone === t ? { backgroundColor: "#b3ecec", borderColor: "#b3ecec" } : { backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}>
-              <div className="w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center" style={{ borderColor: data.tone === t ? "#1A4040" : "hsl(var(--border))" }}>
-                {data.tone === t && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#1A4040" }} />}
+              style={data.tone === tone ? { backgroundColor: "#b3ecec", borderColor: "#b3ecec" } : { backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}>
+              <div className="w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center" style={{ borderColor: data.tone === tone ? "#1A4040" : "hsl(var(--border))" }}>
+                {data.tone === tone && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#1A4040" }} />}
               </div>
-              <p className="text-sm font-medium capitalize" style={{ color: data.tone === t ? "#1A4040" : "hsl(var(--foreground))" }}>{t}</p>
+              <p className="text-sm font-medium capitalize" style={{ color: data.tone === tone ? "#1A4040" : "hsl(var(--foreground))" }}>{tone}</p>
             </button>
           ))}
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Preview</label>
+        <label className="text-sm font-medium">{t("onboarding.preview")}</label>
         <div className="rounded-2xl p-4 text-sm leading-relaxed" style={{ backgroundColor: "hsl(var(--color-aqua-mist))", color: "#1A4040" }}>
           "{TONE_PREVIEWS[data.tone]}"
         </div>
@@ -434,21 +431,21 @@ function Step6({ data, update }: { data: OnboardingData; update: <K extends keyo
   );
 }
 
-function Step7({ data, update }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void }) {
+function Step7({ data, update, t }: { data: OnboardingData; update: <K extends keyof OnboardingData>(k: K, v: OnboardingData[K]) => void; t: Tf }) {
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-heading font-semibold mb-1">Safety setup</h2><p className="text-sm text-muted-foreground">Optional, but recommended. You can change this any time.</p></div>
+      <div><h2 className="text-2xl font-heading font-semibold mb-1">{t("onboarding.step7Title")}</h2><p className="text-sm text-muted-foreground">{t("onboarding.step7Desc")}</p></div>
       <div className="rounded-2xl p-4 text-sm" style={{ backgroundColor: "hsl(var(--color-lavender-mist))", borderLeft: "3px solid hsl(var(--color-lavender))" }}>
-        If PULZ detects a high-distress pattern, it can prompt you to reach out to someone you trust.
+        {t("onboarding.crisisInfo")}
       </div>
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Crisis contact name <span className="text-muted-foreground font-normal">(optional)</span></label>
-          <input type="text" value={data.crisisName} onChange={(e) => update("crisisName", e.target.value)} placeholder="e.g. Mum, Dr. Ionescu" className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
+          <label className="text-sm font-medium">{t("onboarding.crisisContactName")} <span className="text-muted-foreground font-normal">{t("common.optional")}</span></label>
+          <input type="text" value={data.crisisName} onChange={(e) => update("crisisName", e.target.value)} placeholder={t("onboarding.crisisNamePlaceholder")} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Phone number <span className="text-muted-foreground font-normal">(optional)</span></label>
-          <input type="tel" value={data.crisisPhone} onChange={(e) => update("crisisPhone", e.target.value)} placeholder="e.g. +40 712 345 678" className="w-full px-4 py-3 rounded-2xl border text-sm bg-card font-mono focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
+          <label className="text-sm font-medium">{t("onboarding.phoneNumber")} <span className="text-muted-foreground font-normal">{t("common.optional")}</span></label>
+          <input type="tel" value={data.crisisPhone} onChange={(e) => update("crisisPhone", e.target.value)} placeholder={t("onboarding.crisisPhonePlaceholder")} className="w-full px-4 py-3 rounded-2xl border text-sm bg-card font-mono focus:outline-none" style={{ borderColor: "hsl(var(--border))" }} />
         </div>
       </div>
       <label className="flex items-start gap-3 cursor-pointer">
@@ -458,7 +455,7 @@ function Step7({ data, update }: { data: OnboardingData; update: <K extends keyo
           {data.safetyAgreed && <Check size={12} color="#1A4040" />}
         </div>
         <span className="text-sm text-muted-foreground leading-relaxed">
-          I understand PULZ is a wellness support tool, not a medical device or crisis service. In an emergency I will contact emergency services or a qualified professional.
+          {t("onboarding.safetyAgreement")}
         </span>
       </label>
     </div>

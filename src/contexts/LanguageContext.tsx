@@ -1,48 +1,44 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { LangCode, TranslationKey, LANGUAGE_NAMES, getTranslations } from "@/translations";
-
-const STORAGE_KEY = "pulz_language";
-const DEFAULT_LANG: LangCode = "en";
-
-function readStoredLang(): LangCode {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "en" || stored === "ro" || stored === "fr" || stored === "es") return stored;
-  return DEFAULT_LANG;
-}
+import { createContext, useContext, useState } from "react";
+import { translations } from "@/translations";
+import type { LangCode } from "@/translations";
 
 interface LanguageContextType {
   language: LangCode;
-  languageName: string;
   setLanguage: (lang: LangCode) => void;
-  t: (key: TranslationKey) => string;
+  t: (key: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLangState] = useState<LangCode>(readStoredLang);
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [language, setLanguageState] = useState<LangCode>(() => {
+    return (localStorage.getItem("pulz_language") as LangCode) || "en";
+  });
 
-  const setLanguage = useCallback((lang: LangCode) => {
-    localStorage.setItem(STORAGE_KEY, lang);
-    setLangState(lang);
-  }, []);
+  const setLanguage = (lang: LangCode) => {
+    console.log("[LanguageContext] language changed to:", lang);
+    setLanguageState(lang);
+    localStorage.setItem("pulz_language", lang);
+  };
 
-  const t = useCallback(
-    (key: TranslationKey) => getTranslations(language)(key),
-    [language]
-  );
+  const t = (key: string): string => {
+    const keys = key.split(".");
+    let value: unknown = translations[language];
+    for (const k of keys) {
+      value = (value as Record<string, unknown>)?.[k];
+    }
+    return (value as string) ?? key;
+  };
 
   return (
-    <LanguageContext.Provider
-      value={{ language, languageName: LANGUAGE_NAMES[language], setLanguage, t }}
-    >
+    <LanguageContext.Provider value={{ language, setLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );
 }
 
-export function useLanguage() {
+export const useLanguage = () => {
   const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error("useLanguage must be used within LanguageProvider");
+  if (!ctx) throw new Error("useLanguage must be used inside LanguageProvider");
   return ctx;
-}
+};
