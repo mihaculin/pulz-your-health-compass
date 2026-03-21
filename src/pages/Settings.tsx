@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { LangCode } from "@/translations";
 
 const DEFAULT_PREFS = {
   interventions: true,
@@ -21,13 +23,13 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted, appLoading } = useApp();
   const { user, role } = useAuth();
+  const { t, language, setLanguage } = useLanguage();
 
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
   const [device, setDevice] = useState<{ deviceType: string; lastSync: string | null; isActive: boolean | null } | null>(null);
   const [specialistName, setSpecialistName] = useState<string | null>(null);
 
   const [deleteModal, setDeleteModal] = useState(false);
-  const language = personalisation.language;
   const notifs = {
     interventions: prefs.interventions,
     dailyCheckin: prefs.dailyCheckin,
@@ -199,8 +201,8 @@ export default function SettingsPage() {
     return (
       <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6 pb-16">
         <div className="slide-up">
-          <h1 className="text-2xl lg:text-3xl font-heading font-semibold">Settings</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Profile & preferences</p>
+          <h1 className="text-2xl lg:text-3xl font-heading font-semibold">{t("settings.title")}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t("settings.subtitle")}</p>
         </div>
         {[120, 80, 80, 60].map((h, i) => (
           <div key={i} className="bg-muted rounded-xl animate-pulse" style={{ height: h }} />
@@ -213,8 +215,8 @@ export default function SettingsPage() {
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6 pb-16">
       {/* Header */}
       <div className="slide-up">
-        <h1 className="text-2xl lg:text-3xl font-heading font-semibold">Settings</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Profile & preferences</p>
+        <h1 className="text-2xl lg:text-3xl font-heading font-semibold">{t("settings.title")}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">{t("settings.subtitle")}</p>
       </div>
 
       {/* ─── PROFILE CARD ─── */}
@@ -231,16 +233,16 @@ export default function SettingsPage() {
           </div>
           <div className="min-w-0">
             <h2 className="font-heading font-semibold text-lg">{fullName || "—"}</h2>
-            <p className="text-sm text-muted-foreground">Age {age ?? "—"}</p>
+            <p className="text-sm text-muted-foreground">{t("settings.personalData.age")} {age ?? "—"}</p>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {primaryConcerns.length > 0 ? (
                 primaryConcerns.map((c) => (
                   <span key={c} className="chip-trigger px-2.5 py-1 rounded-full text-xs">{c}</span>
                 ))
               ) : intakeSurveyCompleted ? (
-                <span className="text-xs text-muted-foreground">No concerns added</span>
+                <span className="text-xs text-muted-foreground">{t("settings.personalData.noConcerns")}</span>
               ) : (
-                <span className="text-xs text-muted-foreground">Complete your profile to add concerns</span>
+                <span className="text-xs text-muted-foreground">{t("settings.personalData.completeProfile")}</span>
               )}
             </div>
             {(heightCm || weightKg) && (
@@ -257,7 +259,7 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-2">Started {joinedWeeksAgo} weeks ago</p>
+            <p className="text-xs text-muted-foreground mt-2">Started {joinedWeeksAgo} {t("settings.personalData.weeksAgo")}</p>
           </div>
         </div>
       </div>
@@ -489,10 +491,16 @@ export default function SettingsPage() {
           <label className="text-sm font-medium">Language</label>
           <select
             value={language}
-            onChange={(e) => updatePersonalisation({ language: e.target.value })}
+            onChange={(e) => {
+              updatePersonalisation({ language: e.target.value });
+              setLanguage(e.target.value as LangCode);
+            }}
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#b3ecec] focus:ring-2 focus:ring-[#b3ecec]/30 transition"
           >
-            {["Romanian", "English"].map((l) => <option key={l}>{l}</option>)}
+            <option value="en">English</option>
+            <option value="ro">Română</option>
+            <option value="fr">Français</option>
+            <option value="es">Español</option>
           </select>
         </div>
 
