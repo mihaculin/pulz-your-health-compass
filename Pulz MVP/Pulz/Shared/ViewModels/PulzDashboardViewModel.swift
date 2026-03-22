@@ -249,20 +249,26 @@ final class PulzDashboardViewModel {
         guard realtimeChannel == nil else { return }
         let channel = supabaseService.channel(name: "pulz-dashboard-\(userId)")
 
-        let sensorSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "sensor_samples", filter: "user_id=eq.\(userId)") { [weak self] action in
-            self?.handleSensorAction(action)
+        let sensorSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "sensor_samples", filter: "user_id=eq.\(userId)") { action in
+            Task { @MainActor [weak self] in
+                self?.handleSensorAction(action)
+            }
         }
 
-        let riskSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "risk_windows", filter: "user_id=eq.\(userId)") { [weak self] action in
-            self?.handleRiskAction(action)
+        let riskSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "risk_windows", filter: "user_id=eq.\(userId)") { action in
+            Task { @MainActor [weak self] in
+                self?.handleRiskAction(action)
+            }
         }
 
-        let reportSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "self_reports", filter: "user_id=eq.\(userId)") { [weak self] action in
-            self?.handleReportAction(action)
+        let reportSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "self_reports", filter: "user_id=eq.\(userId)") { action in
+            Task { @MainActor [weak self] in
+                self?.handleReportAction(action)
+            }
         }
 
         realtimeSubscriptions = [sensorSubscription, riskSubscription, reportSubscription]
-        await channel.subscribe()
+        try? await channel.subscribeWithError()
         realtimeChannel = channel
     }
 

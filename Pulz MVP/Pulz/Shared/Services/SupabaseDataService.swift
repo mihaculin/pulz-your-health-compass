@@ -4,7 +4,8 @@ import Supabase
 #endif
 
 #if os(iOS) && canImport(Supabase)
-actor SupabaseDataService {
+@MainActor
+final class SupabaseDataService {
     static let shared = SupabaseDataService(configuration: .live)
 
     private let client: SupabaseClient
@@ -86,6 +87,21 @@ actor SupabaseDataService {
                 .eq("user_id", value: userId)
                 .order("timestamp", ascending: false)
                 .limit(limit)
+                .execute()
+            return response.value
+        } catch {
+            return []
+        }
+    }
+
+    func fetchSelfReports(userId: String, since: Date) async -> [SupabaseSelfReportRecord] {
+        do {
+            let response: PostgrestResponse<[SupabaseSelfReportRecord]> = try await client
+                .from("self_reports")
+                .select()
+                .eq("user_id", value: userId)
+                .gte("timestamp", value: SupabaseDateFormatter.isoString(since))
+                .order("timestamp", ascending: true)
                 .execute()
             return response.value
         } catch {
@@ -277,7 +293,6 @@ struct SupabaseSelfReportInsert: Encodable, Sendable {
         case emotionalState = "emotional_state"
         case triggers
         case notes
-        case userId = "user_id"
     }
 
     func withUserId(_ userId: String) -> SupabaseSelfReportInsertWithUserId {
@@ -414,7 +429,6 @@ struct SupabasePersonalisationSettingsUpsert: Encodable, Sendable {
         case language
         case crisisContactName = "crisis_contact_name"
         case crisisContactPhone = "crisis_contact_phone"
-        case userId = "user_id"
     }
 
     func withUserId(_ userId: String) -> SupabasePersonalisationSettingsUpsertWithUserId {
@@ -491,7 +505,6 @@ struct SupabaseClientProfileUpsert: Encodable, Sendable {
         case intakeSurveyResponses = "intake_survey_responses"
         case coOccurringConditions = "co_occurring_conditions"
         case intakeSurveyCompleted = "intake_survey_completed"
-        case id
     }
 
     func withUserId(_ userId: String) -> SupabaseClientProfileUpsertWithUserId {
@@ -535,7 +548,6 @@ struct SupabaseProfileUpsert: Encodable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case fullName = "full_name"
-        case userId = "user_id"
     }
 
     func withUserId(_ userId: String) -> SupabaseProfileUpsertWithUserId {

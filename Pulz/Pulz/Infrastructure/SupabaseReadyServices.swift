@@ -47,6 +47,12 @@ protocol CloudSyncServicing {
     func send(event: ImpulseEvent) async
 }
 
+enum SyncStatus: String {
+    case connecting
+    case connected
+    case disconnected
+}
+
 struct BootstrapSnapshot {
     let profile: ProfileRecord?
     let clientProfile: ClientProfileRecord?
@@ -58,6 +64,8 @@ struct BootstrapSnapshot {
 protocol ProfileSyncServicing {
     func prepareNewUser(account: AuthAccount, fullName: String) async
     func fetchBootstrap(for account: AuthAccount) async -> BootstrapSnapshot
+    func updateClientProfile(_ record: ClientProfileUpdateRecord) async
+    func upsertPersonalisation(_ record: PersonalisationUpdateRecord) async
 }
 
 enum StubServiceError: LocalizedError {
@@ -132,6 +140,14 @@ actor MockProfileSyncService: ProfileSyncServicing {
             recentInterventions: []
         )
     }
+
+    func updateClientProfile(_ record: ClientProfileUpdateRecord) async {
+        _ = record
+    }
+
+    func upsertPersonalisation(_ record: PersonalisationUpdateRecord) async {
+        _ = record
+    }
 }
 
 #if os(iOS) && canImport(Supabase)
@@ -194,21 +210,27 @@ actor SupabaseIntakeSyncService: IntakeSyncServicing {
     }
 
     func saveIntake(_ payload: IntakePayload, for account: AuthAccount) async throws {
-        let record = IntakeInsertRecord(
+        let record = PersonalisationUpdateRecord(
             userId: account.id.uuidString,
-            fullName: payload.fullName,
-            dateOfBirth: SupabasePayloads.isoString(payload.dateOfBirth),
-            selectedConcerns: payload.selectedConcerns,
-            commonTriggers: payload.commonTriggers,
-            selectedDevice: payload.selectedDevice,
-            selectedTheme: payload.selectedTheme,
-            selectedTone: payload.selectedTone,
-            supportMessage: payload.supportMessage
+            theme: payload.selectedTheme,
+            accentColor: nil,
+            messageTone: payload.selectedTone,
+            interventionMessage1: payload.supportMessage,
+            interventionMessage2: nil,
+            interventionMessage3: nil,
+            vibrationPattern: nil,
+            vibrationIntensity: nil,
+            soundEnabled: nil,
+            soundType: nil,
+            soundVolume: nil,
+            language: nil,
+            crisisContactName: nil,
+            crisisContactPhone: nil
         )
 
         try await client
             .from("personalisation_settings")
-            .insert(record)
+            .upsert(record)
             .execute()
     }
 }
@@ -229,13 +251,17 @@ actor SupabaseCloudSyncService: CloudSyncServicing {
             let record = SensorSampleInsertRecord(
                 userId: session.user.id.uuidString,
                 timestamp: SupabasePayloads.isoString(sample.timestamp),
+                deviceType: sample.source == .mock ? "iphone" : "apple_watch",
+                sourcePlatform: "healthkit",
                 heartRate: sample.heartRate,
-                movement: sample.movement,
-                wristTemperatureDelta: sample.wristTemperatureDelta,
-                derivedStress: sample.derivedStress,
-                ecgIrregularityScore: sample.ecgIrregularityScore,
-                source: sample.source.rawValue,
-                state: state.rawValue
+                restingHeartRate: nil,
+                hrvSDNN: nil,
+                skinTemperatureDelta: sample.wristTemperatureDelta,
+                steps: nil,
+                activityState: SupabasePayloads.activityState(for: sample.movement),
+                sleepState: nil,
+                stressScore: sample.derivedStress * 100,
+                confidence: state == .highRisk ? "high" : (state == .elevated ? "medium" : "low")
             )
             try await client
                 .from("sensor_samples")
@@ -251,15 +277,12 @@ actor SupabaseCloudSyncService: CloudSyncServicing {
             let session = try await client.auth.session
             let record = RiskWindowInsertRecord(
                 userId: session.user.id.uuidString,
-                timestamp: SupabasePayloads.isoString(event.timestamp),
-                state: event.state.rawValue,
-                severity: event.severity,
-                confidence: event.confidence.rawValue,
+                startedAt: SupabasePayloads.isoString(event.timestamp),
+                urgeRiskScore: Double(event.severity) * 30,
+                bingeRiskScore: Double(event.severity) * 20,
+                confidenceLevel: event.confidence.rawValue,
                 dominantDrivers: event.dominantDrivers,
-                tags: event.tags.map(\.rawValue),
-                interventionText: event.interventionText,
-                trainingLabel: event.trainingLabel?.storedValue,
-                note: event.note?.text
+                recommendedAction: event.interventionText
             )
             try await client
                 .from("risk_windows")
@@ -309,6 +332,22 @@ actor SupabaseProfileSyncService: ProfileSyncServicing {
         )
     }
 
+    func updateClientProfile(_ record: ClientProfileUpdateRecord) async {
+        do {
+            try await client.from("client_profiles").upsert(record).execute()
+        } catch {
+            // Ignore update errors for now.
+        }
+    }
+
+    func upsertPersonalisation(_ record: PersonalisationUpdateRecord) async {
+        do {
+            try await client.from("personalisation_settings").upsert(record).execute()
+        } catch {
+            // Ignore update errors for now.
+        }
+    }
+
     private func fetchProfile(for userId: String) async -> ProfileRecord? {
         await fetchOptionalSingle(from: "profiles", matching: "user_id", value: userId)
     }
@@ -327,7 +366,7 @@ actor SupabaseProfileSyncService: ProfileSyncServicing {
                 .from("risk_windows")
                 .select()
                 .eq("user_id", value: userId)
-                .order("timestamp", ascending: false)
+                .order("started_at", ascending: false)
                 .limit(12)
                 .execute()
             return response.value
@@ -384,83 +423,176 @@ nonisolated private struct ClientProfileUpsertRecord: Encodable {
     let id: String
 }
 
+nonisolated struct ClientProfileUpdateRecord: Encodable {
+    let id: String
+    let dateOfBirth: String?
+    let primaryConcerns: [String]?
+    let heightCm: Double?
+    let weightKg: Double?
+    let coOccurringConditions: [String]?
+    let intakeSurveyResponses: [String: AnyEncodable]?
+    let intakeSurveyCompleted: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case dateOfBirth = "date_of_birth"
+        case primaryConcerns = "primary_concerns"
+        case heightCm = "height_cm"
+        case weightKg = "weight_kg"
+        case coOccurringConditions = "co_occurring_conditions"
+        case intakeSurveyResponses = "intake_survey_responses"
+        case intakeSurveyCompleted = "intake_survey_completed"
+    }
+}
+
+nonisolated struct PersonalisationUpdateRecord: Encodable {
+    let userId: String
+    let theme: String?
+    let accentColor: String?
+    let messageTone: String?
+    let interventionMessage1: String?
+    let interventionMessage2: String?
+    let interventionMessage3: String?
+    let vibrationPattern: String?
+    let vibrationIntensity: Double?
+    let soundEnabled: Bool?
+    let soundType: String?
+    let soundVolume: Double?
+    let language: String?
+    let crisisContactName: String?
+    let crisisContactPhone: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case theme = "theme"
+        case accentColor = "accent_color"
+        case messageTone = "message_tone"
+        case interventionMessage1 = "intervention_message_1"
+        case interventionMessage2 = "intervention_message_2"
+        case interventionMessage3 = "intervention_message_3"
+        case vibrationPattern = "vibration_pattern"
+        case vibrationIntensity = "vibration_intensity"
+        case soundEnabled = "sound_enabled"
+        case soundType = "sound_type"
+        case soundVolume = "sound_volume"
+        case language = "language"
+        case crisisContactName = "crisis_contact_name"
+        case crisisContactPhone = "crisis_contact_phone"
+    }
+}
+
+nonisolated struct SelfReportInsertRecord: Encodable {
+    let userId: String
+    let timestamp: String
+    let urgeLevel: Double?
+    let bingeOccurred: Bool?
+    let purgeOccurred: Bool?
+    let overeatingOccurred: Bool?
+    let mealSkipped: Bool?
+    let anxietyLevel: Double?
+    let shameLevel: Double?
+    let lonelinessLevel: Double?
+    let emotionalState: [String]?
+    let triggers: [String]?
+    let notes: String?
+    let reportType: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case timestamp = "timestamp"
+        case urgeLevel = "urge_level"
+        case bingeOccurred = "binge_occurred"
+        case purgeOccurred = "purge_occurred"
+        case overeatingOccurred = "overeating_occurred"
+        case mealSkipped = "meal_skipped"
+        case anxietyLevel = "anxiety_level"
+        case shameLevel = "shame_level"
+        case lonelinessLevel = "loneliness_level"
+        case emotionalState = "emotional_state"
+        case triggers = "triggers"
+        case notes = "notes"
+        case reportType = "report_type"
+    }
+}
+
+struct AnyEncodable: Encodable {
+    private let encodeClosure: (Encoder) throws -> Void
+
+    init<T: Encodable>(_ value: T) {
+        encodeClosure = value.encode(to:)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try encodeClosure(encoder)
+    }
+}
+
 nonisolated private enum SupabasePayloads {
     nonisolated static func isoString(_ date: Date) -> String {
         ISO8601DateFormatter().string(from: date)
     }
-}
 
-nonisolated private struct IntakeInsertRecord: Encodable {
-    let userId: String
-    let fullName: String
-    let dateOfBirth: String
-    let selectedConcerns: [String]
-    let commonTriggers: [String]
-    let selectedDevice: String
-    let selectedTheme: String
-    let selectedTone: String
-    let supportMessage: String
-
-    private enum CodingKeys: String, CodingKey {
-        case userId = "user_id"
-        case fullName = "full_name"
-        case dateOfBirth = "date_of_birth"
-        case selectedConcerns = "selected_concerns"
-        case commonTriggers = "common_triggers"
-        case selectedDevice = "selected_device"
-        case selectedTheme = "selected_theme"
-        case selectedTone = "selected_tone"
-        case supportMessage = "support_message"
+    nonisolated static func activityState(for movement: Double) -> String {
+        switch movement {
+        case ..<0.2:
+            return "low"
+        case ..<0.6:
+            return "moderate"
+        default:
+            return "active"
+        }
     }
 }
 
 nonisolated private struct SensorSampleInsertRecord: Encodable {
     let userId: String
     let timestamp: String
+    let deviceType: String
+    let sourcePlatform: String
     let heartRate: Double
-    let movement: Double
-    let wristTemperatureDelta: Double?
-    let derivedStress: Double
-    let ecgIrregularityScore: Double
-    let source: String
-    let state: String
+    let restingHeartRate: Double?
+    let hrvSDNN: Double?
+    let skinTemperatureDelta: Double?
+    let steps: Double?
+    let activityState: String
+    let sleepState: String?
+    let stressScore: Double
+    let confidence: String
 
     private enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case timestamp = "timestamp"
+        case deviceType = "device_type"
+        case sourcePlatform = "source_platform"
         case heartRate = "heart_rate"
-        case movement = "movement"
-        case wristTemperatureDelta = "wrist_temperature_delta"
-        case derivedStress = "derived_stress"
-        case ecgIrregularityScore = "ecg_irregularity_score"
-        case source = "source"
-        case state = "state"
+        case restingHeartRate = "resting_heart_rate"
+        case hrvSDNN = "hrv_sdnn"
+        case skinTemperatureDelta = "skin_temperature_delta"
+        case steps = "steps"
+        case activityState = "activity_state"
+        case sleepState = "sleep_state"
+        case stressScore = "stress_score"
+        case confidence = "confidence"
     }
 }
 
 nonisolated private struct RiskWindowInsertRecord: Encodable {
     let userId: String
-    let timestamp: String
-    let state: String
-    let severity: Int
-    let confidence: String
+    let startedAt: String
+    let urgeRiskScore: Double
+    let bingeRiskScore: Double
+    let confidenceLevel: String
     let dominantDrivers: [String]
-    let tags: [String]
-    let interventionText: String
-    let trainingLabel: String?
-    let note: String?
+    let recommendedAction: String
 
     private enum CodingKeys: String, CodingKey {
         case userId = "user_id"
-        case timestamp = "timestamp"
-        case state = "state"
-        case severity = "severity"
-        case confidence = "confidence"
+        case startedAt = "started_at"
+        case urgeRiskScore = "urge_risk_score"
+        case bingeRiskScore = "binge_risk_score"
+        case confidenceLevel = "confidence_level"
         case dominantDrivers = "dominant_drivers"
-        case tags = "tags"
-        case interventionText = "intervention_text"
-        case trainingLabel = "training_label"
-        case note = "note"
+        case recommendedAction = "recommended_action"
     }
 }
 #endif
@@ -477,55 +609,79 @@ nonisolated struct ProfileRecord: Decodable {
 
 nonisolated struct ClientProfileRecord: Decodable {
     let id: String?
+    let dateOfBirth: String?
+    let primaryConcerns: [String]?
+    let heightCm: Double?
+    let weightKg: Double?
+    let subscriptionTier: String?
+    let subscriptionStatus: String?
+    let intakeSurveyCompleted: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case dateOfBirth = "date_of_birth"
+        case primaryConcerns = "primary_concerns"
+        case heightCm = "height_cm"
+        case weightKg = "weight_kg"
+        case subscriptionTier = "subscription_tier"
+        case subscriptionStatus = "subscription_status"
+        case intakeSurveyCompleted = "intake_survey_completed"
+    }
 }
 
 nonisolated struct PersonalisationSettingsRecord: Decodable {
     let userId: String?
-    let fullName: String?
-    let dateOfBirth: String?
-    let selectedConcerns: [String]?
-    let commonTriggers: [String]?
-    let selectedDevice: String?
-    let selectedTheme: String?
-    let selectedTone: String?
-    let supportMessage: String?
+    let theme: String?
+    let accentColor: String?
+    let messageTone: String?
+    let interventionMessage1: String?
+    let interventionMessage2: String?
+    let interventionMessage3: String?
+    let vibrationPattern: String?
+    let vibrationIntensity: Double?
+    let soundEnabled: Bool?
+    let soundType: String?
+    let soundVolume: Double?
+    let language: String?
+    let crisisContactName: String?
+    let crisisContactPhone: String?
 
     private enum CodingKeys: String, CodingKey {
         case userId = "user_id"
-        case fullName = "full_name"
-        case dateOfBirth = "date_of_birth"
-        case selectedConcerns = "selected_concerns"
-        case commonTriggers = "common_triggers"
-        case selectedDevice = "selected_device"
-        case selectedTheme = "selected_theme"
-        case selectedTone = "selected_tone"
-        case supportMessage = "support_message"
+        case theme = "theme"
+        case accentColor = "accent_color"
+        case messageTone = "message_tone"
+        case interventionMessage1 = "intervention_message_1"
+        case interventionMessage2 = "intervention_message_2"
+        case interventionMessage3 = "intervention_message_3"
+        case vibrationPattern = "vibration_pattern"
+        case vibrationIntensity = "vibration_intensity"
+        case soundEnabled = "sound_enabled"
+        case soundType = "sound_type"
+        case soundVolume = "sound_volume"
+        case language = "language"
+        case crisisContactName = "crisis_contact_name"
+        case crisisContactPhone = "crisis_contact_phone"
     }
 }
 
 nonisolated struct RiskWindowRecord: Decodable {
     let userId: String?
-    let timestamp: String?
-    let state: String?
-    let severity: Int?
-    let confidence: String?
+    let startedAt: String?
+    let urgeRiskScore: Double?
+    let bingeRiskScore: Double?
+    let confidenceLevel: String?
     let dominantDrivers: [String]?
-    let tags: [String]?
-    let interventionText: String?
-    let trainingLabel: String?
-    let note: String?
+    let recommendedAction: String?
 
     private enum CodingKeys: String, CodingKey {
         case userId = "user_id"
-        case timestamp = "timestamp"
-        case state = "state"
-        case severity = "severity"
-        case confidence = "confidence"
+        case startedAt = "started_at"
+        case urgeRiskScore = "urge_risk_score"
+        case bingeRiskScore = "binge_risk_score"
+        case confidenceLevel = "confidence_level"
         case dominantDrivers = "dominant_drivers"
-        case tags = "tags"
-        case interventionText = "intervention_text"
-        case trainingLabel = "training_label"
-        case note = "note"
+        case recommendedAction = "recommended_action"
     }
 }
 
@@ -542,6 +698,108 @@ nonisolated struct InterventionEventRecord: Decodable {
         case timestamp = "timestamp"
         case kind = "kind"
         case note = "note"
+    }
+}
+
+nonisolated struct SensorSampleRecord: Decodable {
+    let userId: String?
+    let timestamp: String?
+    let deviceType: String?
+    let sourcePlatform: String?
+    let heartRate: Double?
+    let restingHeartRate: Double?
+    let hrvSDNN: Double?
+    let skinTemperatureDelta: Double?
+    let steps: Double?
+    let activityState: String?
+    let sleepState: String?
+    let stressScore: Double?
+    let confidence: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case timestamp = "timestamp"
+        case deviceType = "device_type"
+        case sourcePlatform = "source_platform"
+        case heartRate = "heart_rate"
+        case restingHeartRate = "resting_heart_rate"
+        case hrvSDNN = "hrv_sdnn"
+        case skinTemperatureDelta = "skin_temperature_delta"
+        case steps = "steps"
+        case activityState = "activity_state"
+        case sleepState = "sleep_state"
+        case stressScore = "stress_score"
+        case confidence = "confidence"
+    }
+}
+
+nonisolated struct SelfReportRecord: Decodable {
+    let id: String?
+    let userId: String?
+    let timestamp: String?
+    let urgeLevel: Double?
+    let bingeOccurred: Bool?
+    let purgeOccurred: Bool?
+    let overeatingOccurred: Bool?
+    let mealSkipped: Bool?
+    let anxietyLevel: Double?
+    let shameLevel: Double?
+    let lonelinessLevel: Double?
+    let emotionalState: [String]?
+    let triggers: [String]?
+    let notes: String?
+    let reportType: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case userId = "user_id"
+        case timestamp = "timestamp"
+        case urgeLevel = "urge_level"
+        case bingeOccurred = "binge_occurred"
+        case purgeOccurred = "purge_occurred"
+        case overeatingOccurred = "overeating_occurred"
+        case mealSkipped = "meal_skipped"
+        case anxietyLevel = "anxiety_level"
+        case shameLevel = "shame_level"
+        case lonelinessLevel = "loneliness_level"
+        case emotionalState = "emotional_state"
+        case triggers = "triggers"
+        case notes = "notes"
+        case reportType = "report_type"
+    }
+}
+
+nonisolated struct DeviceConnectionRecord: Decodable {
+    let userId: String?
+    let deviceType: String?
+    let lastSync: String?
+    let isActive: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case deviceType = "device_type"
+        case lastSync = "last_sync"
+        case isActive = "is_active"
+    }
+}
+
+nonisolated struct UserProgressSnapshotRecord: Decodable {
+    let userId: String?
+    let snapshotDate: String?
+    let totalEntries: Int?
+    let avgUrgeLevel: Double?
+    let mostCommonTrigger: String?
+    let mostCommonEmotion: String?
+    let calmDays: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case snapshotDate = "snapshot_date"
+        case totalEntries = "total_entries"
+        case avgUrgeLevel = "avg_urge_level"
+        case mostCommonTrigger = "most_common_trigger"
+        case mostCommonEmotion = "most_common_emotion"
+        case calmDays = "calm_days"
     }
 }
 

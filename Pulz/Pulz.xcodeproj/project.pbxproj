@@ -53,13 +53,6 @@
 			);
 			target = FE5971C32F6E8E3A00B4AD76 /* Pulz */;
 		};
-		FE02C7742F6F622E00898C43 /* Exceptions for "Pulz Watch App" folder in "Pulz Watch App" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"Pulz-Watch-App-Info.plist",
-			);
-			target = FE5971D02F6E8E3C00B4AD76 /* Pulz Watch App */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -73,9 +66,6 @@
 		};
 		FE5971D52F6E8E3C00B4AD76 /* Pulz Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				FE02C7742F6F622E00898C43 /* Exceptions for "Pulz Watch App" folder in "Pulz Watch App" target */,
-			);
 			path = "Pulz Watch App";
 			sourceTree = "<group>";
 		};

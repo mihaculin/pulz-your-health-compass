@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = WatchSessionViewModel()
+    @AppStorage("checkInEnabled") private var checkInEnabled = false
 
     var body: some View {
         ZStack {
@@ -39,6 +40,20 @@ struct ContentView: View {
         }
         .task {
             await viewModel.start()
+            if checkInEnabled {
+                await NotificationManager.shared.requestAuthorization()
+                await NotificationManager.shared.scheduleCheckInEveryMinute()
+            }
+        }
+        .onChange(of: checkInEnabled) { _, isEnabled in
+            Task {
+                if isEnabled {
+                    await NotificationManager.shared.requestAuthorization()
+                    await NotificationManager.shared.scheduleCheckInEveryMinute()
+                } else {
+                    await NotificationManager.shared.cancelCheckInNotifications()
+                }
+            }
         }
     }
 
@@ -69,6 +84,19 @@ struct ContentView: View {
 
     private var actionsPanel: some View {
         VStack(spacing: 10) {
+            HStack {
+                Toggle("1‑minute check‑ins", isOn: $checkInEnabled)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.black)
+                    .toggleStyle(SwitchToggleStyle(tint: WatchPalette.petrol))
+            }
+            .padding(10)
+            .background(WatchPalette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(WatchPalette.border, lineWidth: 1)
+            )
+
             Button("Breathe") {
                 viewModel.breathe()
             }

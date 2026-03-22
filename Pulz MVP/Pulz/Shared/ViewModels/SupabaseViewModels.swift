@@ -79,11 +79,13 @@ final class JournalViewModel {
     private func startRealtimeSubscriptions(userId: String) async {
         guard realtimeChannel == nil else { return }
         let channel = supabaseService.channel(name: "pulz-journal-\(userId)")
-        let reportSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "self_reports", filter: "user_id=eq.\(userId)") { [weak self] action in
-            self?.handleReportAction(action)
+        let reportSubscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "self_reports", filter: "user_id=eq.\(userId)") { action in
+            Task { @MainActor [weak self] in
+                self?.handleReportAction(action)
+            }
         }
         realtimeSubscriptions = [reportSubscription]
-        await channel.subscribe()
+        try? await channel.subscribeWithError()
         realtimeChannel = channel
     }
 
@@ -377,11 +379,13 @@ final class PersonalisationViewModel {
     private func startRealtimeSubscriptions(userId: String) async {
         guard realtimeChannel == nil else { return }
         let channel = supabaseService.channel(name: "pulz-personalisation-\(userId)")
-        let subscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "personalisation_settings", filter: "user_id=eq.\(userId)") { [weak self] action in
-            self?.handlePersonalisationAction(action)
+        let subscription = channel.onPostgresChange(AnyAction.self, schema: "public", table: "personalisation_settings", filter: "user_id=eq.\(userId)") { action in
+            Task { @MainActor [weak self] in
+                self?.handlePersonalisationAction(action)
+            }
         }
         realtimeSubscriptions = [subscription]
-        await channel.subscribe()
+        try? await channel.subscribeWithError()
         realtimeChannel = channel
     }
 

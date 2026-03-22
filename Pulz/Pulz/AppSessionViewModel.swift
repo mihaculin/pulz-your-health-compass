@@ -200,6 +200,7 @@ final class AppSessionViewModel {
 
     func goToNextOnboardingStep() async {
         guard let currentIndex = OnboardingStep.allCases.firstIndex(of: onboardingStep) else { return }
+        await persistOnboardingStep()
         if currentIndex < OnboardingStep.allCases.count - 1 {
             onboardingStep = OnboardingStep.allCases[currentIndex + 1]
         } else {
@@ -215,6 +216,7 @@ final class AppSessionViewModel {
                     supportMessage: firstSupportMessage
                 )
                 try? await environment.intakeSyncService.saveIntake(payload, for: account)
+                await completeOnboarding()
             }
             onboardingCompleted = true
             screen = .dashboard
@@ -289,41 +291,178 @@ final class AppSessionViewModel {
     }
 
     private func applyBootstrap(_ bootstrap: BootstrapSnapshot) {
-        if let name = bootstrap.profile?.fullName ?? bootstrap.personalisation?.fullName {
+        if let name = bootstrap.profile?.fullName {
             fullName = name
         }
-        if let dateString = bootstrap.personalisation?.dateOfBirth,
+        if let dateString = bootstrap.clientProfile?.dateOfBirth,
            let parsedDate = SupabasePayloadsHelper.isoDate(from: dateString) {
             dateOfBirth = parsedDate
         }
-        if let concerns = bootstrap.personalisation?.selectedConcerns, !concerns.isEmpty {
+        if let concerns = bootstrap.clientProfile?.primaryConcerns, !concerns.isEmpty {
             selectedConcerns = Set(concerns)
         }
-        if let triggers = bootstrap.personalisation?.commonTriggers, !triggers.isEmpty {
-            commonTriggers = Set(triggers)
-        }
-        if let device = bootstrap.personalisation?.selectedDevice {
-            selectedDevice = device
-        }
-        if let theme = bootstrap.personalisation?.selectedTheme {
-            selectedTheme = theme
-        }
-        if let tone = bootstrap.personalisation?.selectedTone {
+        if let tone = bootstrap.personalisation?.messageTone {
             selectedTone = tone
         }
-        if let message = bootstrap.personalisation?.supportMessage {
+        if let message = bootstrap.personalisation?.interventionMessage1 {
             firstSupportMessage = message
         }
-        if bootstrap.personalisation != nil {
+        if let contact = bootstrap.personalisation?.crisisContactName {
+            crisisContactName = contact
+        }
+        if let phone = bootstrap.personalisation?.crisisContactPhone {
+            crisisContactPhone = phone
+        }
+        if bootstrap.clientProfile?.intakeSurveyCompleted == true {
             onboardingCompleted = true
         }
         recentRiskWindows = bootstrap.recentRiskWindows
         recentInterventions = bootstrap.recentInterventions
+    }
+
+    private func persistOnboardingStep() async {
+        guard let account else { return }
+        switch onboardingStep {
+        case .aboutYou:
+            let record = ClientProfileUpdateRecord(
+                id: account.id.uuidString,
+                dateOfBirth: SupabasePayloadsHelper.isoString(dateOfBirth),
+                primaryConcerns: nil,
+                heightCm: Double(heightText),
+                weightKg: Double(weightText),
+                coOccurringConditions: nil,
+                intakeSurveyResponses: nil,
+                intakeSurveyCompleted: nil
+            )
+            await environment.profileSyncService.updateClientProfile(record)
+        case .relationshipWithFood:
+            let record = ClientProfileUpdateRecord(
+                id: account.id.uuidString,
+                dateOfBirth: nil,
+                primaryConcerns: Array(selectedConcerns),
+                heightCm: nil,
+                weightKg: nil,
+                coOccurringConditions: nil,
+                intakeSurveyResponses: nil,
+                intakeSurveyCompleted: nil
+            )
+            await environment.profileSyncService.updateClientProfile(record)
+        case .emotionalPatterns:
+            let responses: [String: AnyEncodable] = [
+                "emotional_ratings": AnyEncodable(emotionalRatings),
+                "vulnerable_times": AnyEncodable(Array(vulnerableTimes)),
+                "common_triggers": AnyEncodable(Array(commonTriggers))
+            ]
+            let record = ClientProfileUpdateRecord(
+                id: account.id.uuidString,
+                dateOfBirth: nil,
+                primaryConcerns: nil,
+                heightCm: nil,
+                weightKg: nil,
+                coOccurringConditions: nil,
+                intakeSurveyResponses: responses,
+                intakeSurveyCompleted: nil
+            )
+            await environment.profileSyncService.updateClientProfile(record)
+        case .physicalHealth:
+            let responses: [String: AnyEncodable] = [
+                "conditions": AnyEncodable(conditionsText),
+                "specialist_code": AnyEncodable(specialistCode),
+                "medications": AnyEncodable(medicationsText)
+            ]
+            let record = ClientProfileUpdateRecord(
+                id: account.id.uuidString,
+                dateOfBirth: nil,
+                primaryConcerns: nil,
+                heightCm: nil,
+                weightKg: nil,
+                coOccurringConditions: Array(selectedPhysicalHealthItems),
+                intakeSurveyResponses: responses,
+                intakeSurveyCompleted: nil
+            )
+            await environment.profileSyncService.updateClientProfile(record)
+        case .connectDevice:
+            let record = PersonalisationUpdateRecord(
+                userId: account.id.uuidString,
+                theme: selectedTheme,
+                accentColor: nil,
+                messageTone: selectedTone,
+                interventionMessage1: firstSupportMessage,
+                interventionMessage2: nil,
+                interventionMessage3: nil,
+                vibrationPattern: nil,
+                vibrationIntensity: nil,
+                soundEnabled: nil,
+                soundType: nil,
+                soundVolume: nil,
+                language: nil,
+                crisisContactName: nil,
+                crisisContactPhone: nil
+            )
+            await environment.profileSyncService.upsertPersonalisation(record)
+        case .personalise:
+            let record = PersonalisationUpdateRecord(
+                userId: account.id.uuidString,
+                theme: selectedTheme,
+                accentColor: nil,
+                messageTone: selectedTone,
+                interventionMessage1: firstSupportMessage,
+                interventionMessage2: nil,
+                interventionMessage3: nil,
+                vibrationPattern: nil,
+                vibrationIntensity: nil,
+                soundEnabled: nil,
+                soundType: nil,
+                soundVolume: nil,
+                language: nil,
+                crisisContactName: nil,
+                crisisContactPhone: nil
+            )
+            await environment.profileSyncService.upsertPersonalisation(record)
+        case .safety:
+            let record = PersonalisationUpdateRecord(
+                userId: account.id.uuidString,
+                theme: nil,
+                accentColor: nil,
+                messageTone: nil,
+                interventionMessage1: nil,
+                interventionMessage2: nil,
+                interventionMessage3: nil,
+                vibrationPattern: nil,
+                vibrationIntensity: nil,
+                soundEnabled: nil,
+                soundType: nil,
+                soundVolume: nil,
+                language: nil,
+                crisisContactName: crisisContactName.isEmpty ? nil : crisisContactName,
+                crisisContactPhone: crisisContactPhone.isEmpty ? nil : crisisContactPhone
+            )
+            await environment.profileSyncService.upsertPersonalisation(record)
+        }
+    }
+
+    private func completeOnboarding() async {
+        guard let account else { return }
+        let record = ClientProfileUpdateRecord(
+            id: account.id.uuidString,
+            dateOfBirth: nil,
+            primaryConcerns: nil,
+            heightCm: nil,
+            weightKg: nil,
+            coOccurringConditions: nil,
+            intakeSurveyResponses: nil,
+            intakeSurveyCompleted: true
+        )
+        await environment.profileSyncService.updateClientProfile(record)
     }
 }
 
 private enum SupabasePayloadsHelper {
     static func isoDate(from string: String) -> Date? {
         ISO8601DateFormatter().date(from: string)
+    }
+
+    static func isoString(_ date: Date) -> String {
+        ISO8601DateFormatter().string(from: date)
     }
 }

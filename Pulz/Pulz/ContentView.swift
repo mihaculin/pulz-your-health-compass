@@ -4,13 +4,14 @@ import SwiftUI
 struct ContentView: View {
     @State private var session = AppSessionViewModel()
     @State private var dashboard = PulzDashboardViewModel()
+    @State private var syncStore = SupabaseSyncStore(configuration: .live)
 
     var body: some View {
         ZStack {
             PulzBackground()
 
             if session.isAuthenticated && session.screen == .dashboard {
-                DashboardTabs(session: session, viewModel: dashboard)
+                DashboardTabs(session: session, viewModel: dashboard, syncStore: syncStore)
             } else {
                 AuthFlowView(session: session)
             }
@@ -19,7 +20,19 @@ struct ContentView: View {
         .task {
             await session.restoreSessionIfNeeded()
             if session.isAuthenticated && session.screen == .dashboard {
+                if let account = session.account {
+                    await syncStore.start(userId: account.id.uuidString)
+                }
                 await dashboard.start()
+            }
+        }
+        .onChange(of: session.isAuthenticated) { _, isAuthenticated in
+            Task {
+                if isAuthenticated, let account = session.account {
+                    await syncStore.start(userId: account.id.uuidString)
+                } else {
+                    await syncStore.stop()
+                }
             }
         }
     }
@@ -151,12 +164,13 @@ private struct AuthFlowView: View {
 private struct DashboardTabs: View {
     @Bindable var session: AppSessionViewModel
     @Bindable var viewModel: PulzDashboardViewModel
+    @Bindable var syncStore: SupabaseSyncStore
     @State private var selectedTab = 0
     @State private var activeRecoveryTool: RecoveryTool?
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            DashboardHomeView(session: session, viewModel: viewModel)
+            DashboardHomeView(session: session, viewModel: viewModel, syncStore: syncStore)
                 .environment(\.openRecoveryTool, OpenRecoveryToolAction { tool in
                     activeRecoveryTool = tool
                     viewModel.useRecoveryTool(tool)
@@ -164,15 +178,15 @@ private struct DashboardTabs: View {
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(0)
 
-            JournalView()
+            JournalView(syncStore: syncStore)
                 .tabItem { Label("Journal", systemImage: "book") }
                 .tag(1)
 
-            ProgressPage()
+            ProgressPage(syncStore: syncStore)
                 .tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
                 .tag(2)
 
-            MyPulzView(session: session, viewModel: viewModel)
+            MyPulzView(session: session, viewModel: viewModel, syncStore: syncStore)
                 .tabItem { Label("My PULZ", systemImage: "person.crop.circle") }
                 .tag(3)
         }
@@ -195,6 +209,7 @@ private struct DashboardTabs: View {
 private struct DashboardHomeView: View {
     @Bindable var session: AppSessionViewModel
     @Bindable var viewModel: PulzDashboardViewModel
+    @Bindable var syncStore: SupabaseSyncStore
     @Environment(\.openRecoveryTool) private var openRecoveryTool
 
     var body: some View {
@@ -231,6 +246,28 @@ private struct DashboardHomeView: View {
         viewModel.snapshot.events.first(where: { $0.trainingLabel == nil })
     }
 
+    private var liveSample: BiometricSample {
+        if let record = syncStore.latestSensorSample {
+            return SupabaseMapping.biometricSample(from: record)
+        }
+        return viewModel.snapshot.latestSample
+    }
+
+    @MainActor
+    private var liveTrendSamples: [BiometricSample] {
+        if !syncStore.todaySensorSamples.isEmpty {
+            return syncStore.todaySensorSamples.map(SupabaseMapping.biometricSample(from:))
+        }
+        return viewModel.snapshot.trends
+    }
+
+    private var liveState: EmotionalState {
+        if let risk = syncStore.latestRiskWindow {
+            return SupabaseMapping.riskState(from: risk)
+        }
+        return viewModel.snapshot.state
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Image("logo_nobackground")
@@ -251,13 +288,13 @@ private struct DashboardHomeView: View {
                         .foregroundStyle(PulzPalette.mauve)
                 }
                 Spacer()
-                Text(viewModel.snapshot.state.rawValue.uppercased())
+                Text(liveState.rawValue.uppercased())
                     .font(PulzType.body(12, weight: .bold))
-                    .foregroundStyle(PulzPalette.color(for: viewModel.snapshot.state))
+                    .foregroundStyle(PulzPalette.color(for: liveState))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(PulzPalette.tintBackground(for: viewModel.snapshot.state), in: Capsule())
-                    .overlay(Capsule().stroke(PulzPalette.color(for: viewModel.snapshot.state).opacity(0.25), lineWidth: 1))
+                    .background(PulzPalette.tintBackground(for: liveState), in: Capsule())
+                    .overlay(Capsule().stroke(PulzPalette.color(for: liveState).opacity(0.25), lineWidth: 1))
             }
         }
     }
@@ -323,12 +360,12 @@ private struct DashboardHomeView: View {
     private var biometricsCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
-                metricLine(title: "Heart Rate ❤️", value: "\(Int(viewModel.snapshot.latestSample.heartRate)) BPM")
-                metricLine(title: "Stress ⚠️", value: "\(Int(viewModel.snapshot.latestSample.derivedStress * 100)) %")
+                metricLine(title: "Heart Rate ❤️", value: "\(Int(liveSample.heartRate)) BPM")
+                metricLine(title: "Stress ⚠️", value: "\(Int(liveSample.derivedStress * 100)) %")
                 metricLine(title: "Temperature 🌡️", value: temperatureValue)
                 metricLine(title: "Movement 🏃", value: movementValue)
             }
-            Text(viewModel.snapshot.state.supportiveText)
+            Text(liveState.supportiveText)
                 .font(PulzType.title(16))
                 .italic()
                 .foregroundStyle(PulzPalette.soft)
@@ -348,21 +385,24 @@ private struct DashboardHomeView: View {
             Text("Your body right now")
                 .font(PulzType.title(22))
 
+            let dominantDrivers = syncStore.latestRiskWindow?.dominantDrivers ?? viewModel.snapshot.events.first?.dominantDrivers ?? []
+            let confidenceText = syncStore.latestRiskWindow?.confidenceLevel ?? viewModel.snapshot.events.first?.confidence.rawValue ?? ConfidenceLevel.low.rawValue
+
             HStack {
-                Text(viewModel.snapshot.state.riskSummary)
+                Text(liveState.riskSummary)
                     .font(PulzType.body(15, weight: .semibold))
-                    .foregroundStyle(PulzPalette.color(for: viewModel.snapshot.state))
+                    .foregroundStyle(PulzPalette.color(for: liveState))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(PulzPalette.tintBackground(for: viewModel.snapshot.state), in: Capsule())
+                    .background(PulzPalette.tintBackground(for: liveState), in: Capsule())
                 Spacer()
-                Text(viewModel.snapshot.events.first?.confidence.rawValue ?? ConfidenceLevel.low.rawValue)
+                Text(confidenceText)
                     .font(PulzType.body(12, weight: .bold))
                     .foregroundStyle(PulzPalette.mauve)
             }
 
             HStack(spacing: 8) {
-                ForEach(viewModel.snapshot.events.first?.dominantDrivers ?? [], id: \.self) { driver in
+                ForEach(dominantDrivers, id: \.self) { driver in
                     Text(driver)
                         .font(PulzType.body(12, weight: .semibold))
                         .padding(.horizontal, 10)
@@ -371,7 +411,7 @@ private struct DashboardHomeView: View {
                 }
             }
 
-            Button(viewModel.snapshot.events.first?.interventionText ?? "Would a grounding step help right now?") {
+            Button(syncStore.latestRiskWindow?.recommendedAction ?? viewModel.snapshot.events.first?.interventionText ?? "Would a grounding step help right now?") {
                 openRecoveryTool(.grounding)
             }
             .buttonStyle(PulzCompactButtonStyle())
@@ -392,7 +432,7 @@ private struct DashboardHomeView: View {
                 .font(PulzType.title(22))
 
             Chart {
-                ForEach(viewModel.snapshot.trends) { sample in
+                ForEach(liveTrendSamples) { sample in
                     LineMark(x: .value("Time", sample.timestamp), y: .value("Heart rate", sample.heartRate))
                         .foregroundStyle(PulzPalette.turq)
                         .interpolationMethod(.catmullRom)
@@ -480,47 +520,79 @@ private struct DashboardHomeView: View {
             Text("Today's episode")
                 .font(PulzType.title(22))
 
-            ForEach(viewModel.snapshot.events) { event in
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(event.timestamp.formatted(date: .omitted, time: .shortened))
-                            .font(PulzType.mono(13))
+            if !syncStore.todayReports.isEmpty {
+                ForEach(Array(syncStore.todayReports.enumerated()), id: \.offset) { _, report in
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(SupabaseMapping.timeString(from: report.timestamp))
+                                .font(PulzType.mono(13))
+                                .foregroundStyle(PulzPalette.soft)
+                            Spacer()
+                            Text("Urge \(Int(report.urgeLevel ?? 0))/10")
+                                .font(PulzType.body(12, weight: .bold))
+                                .foregroundStyle(PulzPalette.petrol)
+                        }
+
+                        Text((report.triggers ?? []).joined(separator: " • "))
+                            .font(PulzType.body(13))
                             .foregroundStyle(PulzPalette.soft)
-                        Spacer()
-                        Text(event.state.riskSummary)
-                            .font(PulzType.body(12, weight: .bold))
-                            .foregroundStyle(PulzPalette.color(for: event.state))
-                    }
 
-                    Text(event.tags.map(\.rawValue).joined(separator: " • "))
-                        .font(PulzType.body(13))
-                        .foregroundStyle(PulzPalette.soft)
-
-                    if let note = event.note?.text {
-                        Text(note)
-                            .font(PulzType.body(14))
-                            .foregroundStyle(PulzPalette.text)
-                    }
-
-                    Text("Was this accurate?")
-                        .font(PulzType.body(13, weight: .semibold))
-                        .foregroundStyle(PulzPalette.text)
-
-                    HStack(spacing: 8) {
-                        ForEach(TrainingLabel.allCases) { label in
-                            Button(label.rawValue) {
-                                viewModel.labelEvent(event, as: label)
-                            }
-                            .buttonStyle(PulzChipButtonStyle(selected: event.trainingLabel == label))
+                        if let note = report.notes, !note.isEmpty {
+                            Text(note)
+                                .font(PulzType.body(14))
+                                .foregroundStyle(PulzPalette.text)
                         }
                     }
+                    .padding(16)
+                    .background(PulzPalette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(PulzPalette.border, lineWidth: 1)
+                    )
                 }
-                .padding(16)
-                .background(PulzPalette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(PulzPalette.border, lineWidth: 1)
-                )
+            } else {
+                ForEach(viewModel.snapshot.events) { event in
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(event.timestamp.formatted(date: .omitted, time: .shortened))
+                                .font(PulzType.mono(13))
+                                .foregroundStyle(PulzPalette.soft)
+                            Spacer()
+                            Text(event.state.riskSummary)
+                                .font(PulzType.body(12, weight: .bold))
+                                .foregroundStyle(PulzPalette.color(for: event.state))
+                        }
+
+                        Text(event.tags.map(\.rawValue).joined(separator: " • "))
+                            .font(PulzType.body(13))
+                            .foregroundStyle(PulzPalette.soft)
+
+                        if let note = event.note?.text {
+                            Text(note)
+                                .font(PulzType.body(14))
+                                .foregroundStyle(PulzPalette.text)
+                        }
+
+                        Text("Was this accurate?")
+                            .font(PulzType.body(13, weight: .semibold))
+                            .foregroundStyle(PulzPalette.text)
+
+                        HStack(spacing: 8) {
+                            ForEach(TrainingLabel.allCases) { label in
+                                Button(label.rawValue) {
+                                    viewModel.labelEvent(event, as: label)
+                                }
+                                .buttonStyle(PulzChipButtonStyle(selected: event.trainingLabel == label))
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(PulzPalette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(PulzPalette.border, lineWidth: 1)
+                    )
+                }
             }
         }
         .glassCard(accent: PulzPalette.alert)
@@ -596,14 +668,14 @@ private struct DashboardHomeView: View {
         .padding(.vertical, 4)
     }
     private var temperatureValue: String {
-        if let temp = viewModel.snapshot.latestSample.wristTemperatureDelta {
+        if let temp = liveSample.wristTemperatureDelta {
             return String(format: "%+.1f °C", temp)
         }
         return "N/A"
     }
 
     private var movementValue: String {
-        switch viewModel.snapshot.latestSample.movement {
+        switch liveSample.movement {
         case ..<0.2: return "Low"
         case ..<0.6: return "Moderate"
         default: return "Active"
@@ -792,12 +864,12 @@ private struct OnboardingFlowView: View {
 }
 
 private struct JournalView: View {
+    @Bindable var syncStore: SupabaseSyncStore
     @State private var selectedDate = Date.now
     @State private var intensity: Double = 5
     @State private var selectedTriggers: Set<String> = ["Work stress"]
     @State private var selectedFeelings: Set<String> = ["Anxious"]
     @State private var noteText = ""
-    @State private var savedEntries: [JournalEntry] = []
 
     private let triggerOptions = [
         "Work stress", "Loneliness", "Fatigue", "Boredom", "Conflict", "Body image", "Social event", "Other"
@@ -879,13 +951,13 @@ private struct JournalView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Recent entries")
                         .font(PulzType.body(14, weight: .semibold))
-                    ForEach(savedEntries) { entry in
+                    ForEach(Array(syncStore.recentReports.enumerated()), id: \.offset) { _, report in
                         HStack {
-                            Text(entry.timestampText)
+                            Text(SupabaseMapping.timeString(from: report.timestamp))
                                 .font(PulzType.mono(12))
                                 .foregroundStyle(PulzPalette.soft)
                             Spacer()
-                            Text(entry.summary)
+                            Text(reportSummary(report))
                                 .font(PulzType.body(12, weight: .semibold))
                                 .foregroundStyle(PulzPalette.text)
                         }
@@ -897,7 +969,6 @@ private struct JournalView: View {
             }
             .padding(20)
         }
-        .onAppear(perform: loadEntries)
         .background(
             PulzBackground()
                 .ignoresSafeArea()
@@ -913,10 +984,6 @@ private struct JournalView: View {
                 .buttonStyle(PulzChipButtonStyle(selected: selected.contains(option)))
             }
         }
-        .background(
-            PulzBackground()
-                .ignoresSafeArea()
-        )
     }
 
     private func toggle(_ set: inout Set<String>, value: String) {
@@ -928,56 +995,39 @@ private struct JournalView: View {
     }
 
     private func saveEntry() {
-        let entry = JournalEntry(
-            id: UUID(),
-            date: selectedDate,
-            intensity: Int(intensity),
+        let record = SelfReportInsertRecord(
+            userId: syncStore.profile?.userId ?? syncStore.clientProfile?.id ?? syncStore.currentUserId ?? "",
+            timestamp: SupabaseDateHelper.isoString(from: selectedDate),
+            urgeLevel: intensity,
+            bingeOccurred: nil,
+            purgeOccurred: nil,
+            overeatingOccurred: nil,
+            mealSkipped: nil,
+            anxietyLevel: nil,
+            shameLevel: nil,
+            lonelinessLevel: nil,
+            emotionalState: Array(selectedFeelings).sorted(),
             triggers: Array(selectedTriggers).sorted(),
-            feelings: Array(selectedFeelings).sorted(),
-            note: noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+            notes: noteText.trimmingCharacters(in: .whitespacesAndNewlines),
+            reportType: nil
         )
-        savedEntries.insert(entry, at: 0)
-        persistEntries()
+        Task {
+            await syncStore.createSelfReport(record)
+        }
         noteText = ""
+        selectedTriggers.removeAll()
+        selectedFeelings.removeAll()
     }
 
-    private func loadEntries() {
-        guard let data = UserDefaults.standard.data(forKey: JournalEntry.storageKey) else { return }
-        if let decoded = try? JSONDecoder().decode([JournalEntry].self, from: data) {
-            savedEntries = decoded
-        }
-    }
-
-    private func persistEntries() {
-        if let data = try? JSONEncoder().encode(savedEntries) {
-            UserDefaults.standard.set(data, forKey: JournalEntry.storageKey)
-        }
-    }
-
-    private struct JournalEntry: Identifiable, Codable {
-        static let storageKey = "pulz.journal.entries"
-
-        let id: UUID
-        let date: Date
-        let intensity: Int
-        let triggers: [String]
-        let feelings: [String]
-        let note: String
-
-        var timestampText: String {
-            date.formatted(date: .abbreviated, time: .shortened)
-        }
-
-        var summary: String {
-            if let trigger = triggers.first {
-                return trigger
-            }
-            return "Journal entry"
-        }
+    private func reportSummary(_ report: SelfReportRecord) -> String {
+        let triggers = report.triggers?.prefix(2).joined(separator: " • ") ?? "No triggers"
+        let urge = Int(report.urgeLevel ?? 0)
+        return "Urge \(urge)/10 • \(triggers)"
     }
 }
 
 private struct ProgressPage: View {
+    @Bindable var syncStore: SupabaseSyncStore
     @State private var selectedRange = "This week"
 
     var body: some View {
@@ -1042,14 +1092,26 @@ private struct ProgressPage: View {
                     .frame(height: 180)
                 }
 
-                HStack(alignment: .top, spacing: 12) {
-                    progressStat(title: "Total episodes", value: "18", caption: "This week")
-                    progressStat(title: "Common trigger", value: "Work stress", caption: "Most frequent")
-                }
+                if let snapshot = syncStore.progressSnapshots.first {
+                    HStack(alignment: .top, spacing: 12) {
+                        progressStat(title: "Total episodes", value: "\(snapshot.totalEntries ?? 0)", caption: "Latest")
+                        progressStat(title: "Common trigger", value: snapshot.mostCommonTrigger ?? "—", caption: "Most frequent")
+                    }
 
-                HStack(alignment: .top, spacing: 12) {
-                    progressStat(title: "Avg intensity", value: "5.4", caption: "/10 daily")
-                    progressStat(title: "Improvement", value: "+12%", caption: "vs last week")
+                    HStack(alignment: .top, spacing: 12) {
+                        progressStat(title: "Avg intensity", value: format(snapshot.avgUrgeLevel), caption: "/10 daily")
+                        progressStat(title: "Calm days", value: "\(snapshot.calmDays ?? 0)", caption: "Recent")
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 12) {
+                        progressStat(title: "Total episodes", value: "18", caption: "This week")
+                        progressStat(title: "Common trigger", value: "Work stress", caption: "Most frequent")
+                    }
+
+                    HStack(alignment: .top, spacing: 12) {
+                        progressStat(title: "Avg intensity", value: "5.4", caption: "/10 daily")
+                        progressStat(title: "Improvement", value: "+12%", caption: "vs last week")
+                    }
                 }
 
                 chartCard(title: "Pattern insights") {
@@ -1109,6 +1171,11 @@ private struct ProgressPage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(accent: PulzPalette.aqua)
+    }
+
+    private func format(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return String(format: "%.1f", value)
     }
 
     private var weeklyEpisodes: [ChartSample] {
@@ -1204,6 +1271,7 @@ private struct FlowLayout: Layout {
 private struct MyPulzView: View {
     @Bindable var session: AppSessionViewModel
     @Bindable var viewModel: PulzDashboardViewModel
+    @Bindable var syncStore: SupabaseSyncStore
     @State private var selectedTheme = "Aqua Bloom"
     @State private var accentColor: Color = PulzPalette.turq
     @State private var groundingMessage = "Take a slow breath. You're safe right now."
@@ -1392,6 +1460,46 @@ private struct MyPulzView: View {
             }
             .padding(20)
         }
+        .background(
+            PulzBackground()
+                .ignoresSafeArea()
+        )
+        .onAppear {
+            applyPersonalisation(syncStore.personalisation)
+        }
+        .onChange(of: syncStore.personalisation?.messageTone) { _, _ in
+            applyPersonalisation(syncStore.personalisation)
+        }
+        .onChange(of: selectedTone) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: groundingMessage) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: urgeMessage) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: recoveryMessage) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: vibrationPattern) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: vibrationIntensity) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: soundEnabled) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: interventionLanguage) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: contactName) { _, _ in
+            pushPersonalisationUpdate()
+        }
+        .onChange(of: contactPhone) { _, _ in
+            pushPersonalisationUpdate()
+        }
     }
 
     private func themeCard(title: String, subtitle: String, colors: [Color], selected: Bool, action: @escaping () -> Void) -> some View {
@@ -1486,6 +1594,64 @@ private struct MyPulzView: View {
         }
         .buttonStyle(.plain)
     }
+
+    private func applyPersonalisation(_ settings: PersonalisationSettingsRecord?) {
+        guard let settings else { return }
+        if let tone = settings.messageTone {
+            selectedTone = tone
+        }
+        if let message = settings.interventionMessage1 {
+            groundingMessage = message
+        }
+        if let message = settings.interventionMessage2 {
+            urgeMessage = message
+        }
+        if let message = settings.interventionMessage3 {
+            recoveryMessage = message
+        }
+        if let pattern = settings.vibrationPattern {
+            vibrationPattern = pattern
+        }
+        if let intensity = settings.vibrationIntensity {
+            vibrationIntensity = intensity
+        }
+        if let enabled = settings.soundEnabled {
+            soundEnabled = enabled
+        }
+        if let language = settings.language {
+            interventionLanguage = language
+        }
+        if let contact = settings.crisisContactName {
+            contactName = contact
+        }
+        if let phone = settings.crisisContactPhone {
+            contactPhone = phone
+        }
+    }
+
+    private func pushPersonalisationUpdate() {
+        guard let userId = syncStore.profile?.userId ?? syncStore.clientProfile?.id else { return }
+        let record = PersonalisationUpdateRecord(
+            userId: userId,
+            theme: nil,
+            accentColor: nil,
+            messageTone: selectedTone,
+            interventionMessage1: groundingMessage,
+            interventionMessage2: urgeMessage,
+            interventionMessage3: recoveryMessage,
+            vibrationPattern: vibrationPattern,
+            vibrationIntensity: vibrationIntensity,
+            soundEnabled: soundEnabled,
+            soundType: nil,
+            soundVolume: nil,
+            language: interventionLanguage,
+            crisisContactName: contactName.isEmpty ? nil : contactName,
+            crisisContactPhone: contactPhone.isEmpty ? nil : contactPhone
+        )
+        Task {
+            await syncStore.updatePersonalisation(record)
+        }
+    }
 }
 
 private struct PulzPrimaryButtonStyle: ButtonStyle {
@@ -1553,6 +1719,63 @@ private struct PulzTextFieldStyle: TextFieldStyle {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(PulzPalette.border, lineWidth: 1)
             )
+    }
+}
+
+private enum SupabaseMapping {
+    static func biometricSample(from record: SensorSampleRecord) -> BiometricSample {
+        let timestamp = SupabaseDateHelper.date(from: record.timestamp) ?? .now
+        let movement = movementLevel(from: record.activityState)
+        let stressScore = (record.stressScore ?? 0) / 100
+        return BiometricSample(
+            timestamp: timestamp,
+            heartRate: record.heartRate ?? 0,
+            movement: movement,
+            wristTemperatureDelta: record.skinTemperatureDelta,
+            derivedStress: min(1, max(0, stressScore)),
+            ecgIrregularityScore: 0.1,
+            source: .live
+        )
+    }
+
+    static func riskState(from record: RiskWindowRecord) -> EmotionalState {
+        let score = record.urgeRiskScore ?? 0
+        if score >= 70 {
+            return .highRisk
+        }
+        if score >= 40 {
+            return .elevated
+        }
+        return .calm
+    }
+
+    static func timeString(from isoString: String?) -> String {
+        guard let date = SupabaseDateHelper.date(from: isoString) else { return "--:--" }
+        return date.formatted(date: .omitted, time: .shortened)
+    }
+
+    private static func movementLevel(from value: String?) -> Double {
+        switch value?.lowercased() {
+        case "low":
+            return 0.1
+        case "moderate":
+            return 0.45
+        case "active":
+            return 0.8
+        default:
+            return 0.3
+        }
+    }
+}
+
+private enum SupabaseDateHelper {
+    static func date(from isoString: String?) -> Date? {
+        guard let isoString else { return nil }
+        return ISO8601DateFormatter().date(from: isoString)
+    }
+
+    static func isoString(from date: Date) -> String {
+        ISO8601DateFormatter().string(from: date)
     }
 }
 
