@@ -7,6 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface SelfReport {
   timestamp: string;
@@ -30,6 +31,7 @@ export default function Progress() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isPremium } = useSubscription();
   const ranges = [t("progress.thisWeek"), t("progress.thisMonth"), t("progress.last3Months")];
   const [range, setRange] = useState(ranges[0]);
   const [reports, setReports] = useState<SelfReport[]>([]);
@@ -236,6 +238,31 @@ export default function Progress() {
           </div>
         ))}
       </div>
+
+      {!isPremium && (
+        <div
+          className="rounded-2xl p-7 text-center slide-up flex flex-col items-center gap-3"
+          style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec", animationDelay: "360ms" }}
+        >
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="18" fill="#b3ecec" fillOpacity="0.4" />
+            <circle cx="20" cy="20" r="10" fill="#b3ecec" />
+          </svg>
+          <div>
+            <p className="font-semibold text-sm mb-1" style={{ color: "#1A4040" }}>Deblochează istoricul complet</p>
+            <p className="text-xs max-w-xs mx-auto" style={{ color: "#6B7280" }}>
+              Premium include progress nelimitat, pattern detection avansat și insights personalizate.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/pricing")}
+            className="px-5 py-2.5 rounded-xl text-sm font-medium text-white active:scale-95 transition-all mt-1"
+            style={{ backgroundColor: "#2D7D6F" }}
+          >
+            Upgrade la Premium →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

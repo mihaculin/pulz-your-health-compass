@@ -62,6 +62,9 @@ interface AppContextType {
   specialistCode: string | null;
   surveyTriggers: string[];
   riskLevel: "Calm" | "Elevated" | "Trigger Risk";
+  subscriptionTier: "free" | "premium" | "clinic";
+  subscriptionStatus: "active" | "inactive" | "cancelled" | "past_due";
+  subscriptionEndDate: string | null;
   updatePersonalisation: (patch: Partial<PersonalisationSettings>) => Promise<void>;
   markIntakeSurveyCompleted: () => Promise<void>;
   setRiskLevel: (level: "Calm" | "Elevated" | "Trigger Risk") => void;
@@ -125,6 +128,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [conditions, setConditions] = useState<string[]>([]);
   const [specialistCode, setSpecialistCode] = useState<string | null>(null);
   const [surveyTriggers, setSurveyTriggers] = useState<string[]>([]);
+  const [subscriptionTier, setSubscriptionTier] = useState<"free" | "premium" | "clinic">("free");
+  const [subscriptionStatus, setSubscriptionStatus] = useState<"active" | "inactive" | "cancelled" | "past_due">("inactive");
+  const [subscriptionEndDate, setSubscriptionEndDate] = useState<string | null>(null);
   const lastFetchKey = useRef<string | null>(null);
 
   const refreshProfile = () => {
@@ -148,6 +154,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setConditions([]);
       setSpecialistCode(null);
       setSurveyTriggers([]);
+      setSubscriptionTier("free");
+      setSubscriptionStatus("inactive");
+      setSubscriptionEndDate(null);
       return;
     }
 
@@ -175,6 +184,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setConditions(cached.conditions ?? []);
       setSpecialistCode(cached.specialistCode ?? null);
       setSurveyTriggers(cached.surveyTriggers ?? []);
+      setSubscriptionTier(cached.subscriptionTier ?? "free");
+      setSubscriptionStatus(cached.subscriptionStatus ?? "inactive");
+      setSubscriptionEndDate(cached.subscriptionEndDate ?? null);
       if (cached.personalisation) {
         applyThemeById(cached.personalisation.theme, cached.personalisation.accentColor);
       }
@@ -189,7 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from("personalisation_settings").select("*").eq("user_id", user.id).maybeSingle(),
         supabase
           .from("client_profiles")
-          .select("intake_survey_completed, date_of_birth, primary_concerns, height_cm, weight_kg, co_occurring_conditions, intake_survey_responses")
+          .select("intake_survey_completed, date_of_birth, primary_concerns, height_cm, weight_kg, co_occurring_conditions, intake_survey_responses, subscription_tier, subscription_status, subscription_end_date")
           .eq("id", user.id)
           .maybeSingle(),
         supabase.from("device_connections").select("id").eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle(),
@@ -225,6 +237,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const isr = (cpRes.data as any)?.intake_survey_responses;
       setSpecialistCode(isr?.specialist_code ?? null);
       setSurveyTriggers(isr?.triggers ?? []);
+      const nextSubTier = ((cpRes.data as any)?.subscription_tier ?? "free") as "free" | "premium" | "clinic";
+      const nextSubStatus = ((cpRes.data as any)?.subscription_status ?? "inactive") as "active" | "inactive" | "cancelled" | "past_due";
+      const nextSubEnd = (cpRes.data as any)?.subscription_end_date ?? null;
+      setSubscriptionTier(nextSubTier);
+      setSubscriptionStatus(nextSubStatus);
+      setSubscriptionEndDate(nextSubEnd);
 
       let nextPs = personalisation;
       let nextPsId = psId;
@@ -273,6 +291,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         conditions: nextConds,
         specialistCode: nextCode,
         surveyTriggers: nextTriggers,
+        subscriptionTier: nextSubTier,
+        subscriptionStatus: nextSubStatus,
+        subscriptionEndDate: nextSubEnd,
       }));
 
       setAppLoading(false);
@@ -372,6 +393,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         specialistCode,
         surveyTriggers,
         riskLevel,
+        subscriptionTier,
+        subscriptionStatus,
+        subscriptionEndDate,
         updatePersonalisation,
         markIntakeSurveyCompleted,
         setRiskLevel,

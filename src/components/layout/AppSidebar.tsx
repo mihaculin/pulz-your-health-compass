@@ -1,9 +1,10 @@
-import { LayoutDashboard, BookOpen, TrendingUp, Settings, SlidersHorizontal, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, TrendingUp, Settings, SlidersHorizontal, LogOut, Sparkles } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useApp } from "@/contexts/AppContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +32,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { fullName, initials, joinedWeeksAgo } = useApp();
   const { t } = useLanguage();
+  const { isPremium } = useSubscription();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -97,6 +99,20 @@ export function AppSidebar() {
       </SidebarContent>
 
       <div style={{ borderTop: "1px solid #E8EAED" }}>
+        {!isPremium && (
+          <button
+            onClick={() => navigate("/pricing")}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-all hover:opacity-90 active:scale-[0.97] ${collapsed ? "justify-center" : ""}`}
+            style={{ background: "linear-gradient(135deg, #b3ecec, #D7C9DB)" }}
+          >
+            <Sparkles size={15} style={{ color: "#1A4040" }} />
+            {!collapsed && (
+              <span className="text-xs font-semibold" style={{ color: "#1A4040" }}>
+                Upgrade la Premium
+              </span>
+            )}
+          </button>
+        )}
         <button
           onClick={handleSignOut}
           className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[#F4EEF7] ${collapsed ? "justify-center" : ""}`}

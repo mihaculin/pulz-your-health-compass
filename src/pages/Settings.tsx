@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User, Bell, Shield, SlidersHorizontal, Trash2, Download, AlertTriangle, ClipboardList, RefreshCw, Unplug, FlaskConical } from "lucide-react";
+import { User, Bell, Shield, SlidersHorizontal, Trash2, Download, AlertTriangle, ClipboardList, RefreshCw, Unplug, FlaskConical, CreditCard, Lock, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { LangCode } from "@/translations";
 import { seedTestData } from "@/utils/seedTestData";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const DEFAULT_PREFS = {
   interventions: true,
@@ -21,8 +22,9 @@ const DEFAULT_PREFS = {
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted, appLoading } = useApp();
+  const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted, appLoading, subscriptionTier, subscriptionStatus, subscriptionEndDate, refreshProfile } = useApp();
   const { user, signOut } = useAuth();
+  const { isPremium } = useSubscription();
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
 
@@ -33,6 +35,8 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [selfReportCount, setSelfReportCount] = useState<number | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [demoActivating, setDemoActivating] = useState(false);
 
   const notifs = {
     interventions: prefs.interventions,
@@ -168,6 +172,32 @@ export default function SettingsPage() {
     navigate("/");
   };
 
+  const handleOpenPortal = async () => {
+    if (!user) return;
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-portal-session", { body: { userId: user.id } });
+      if (error || !data?.url) throw new Error(error?.message ?? "No portal URL");
+      window.location.href = data.url;
+    } catch {
+      toast({ description: "Could not open billing portal.", className: "bg-white border-l-2 border-l-red-300" });
+      setPortalLoading(false);
+    }
+  };
+
+  const handleActivatePremiumDemo = async () => {
+    if (!user) return;
+    setDemoActivating(true);
+    await supabase.from("client_profiles").update({
+      subscription_tier: "premium",
+      subscription_status: "active",
+      subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    }).eq("id", user.id);
+    refreshProfile();
+    toast({ description: "Premium demo activat ✅", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+    setDemoActivating(false);
+  };
+
   const handleSeedData = async () => {
     if (!user) return;
     setSeeding(true);
@@ -249,6 +279,71 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* ─── BILLING CARD ─── */}
+      <div className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-4 slide-up" style={{ animationDelay: "80ms" }}>
+        <div className="flex items-center gap-2">
+          <CreditCard size={18} className="text-muted-foreground" />
+          <h3 className="font-heading font-semibold text-base">Abonament</h3>
+        </div>
+
+        {isPremium ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium flex items-center gap-2">
+                  Plan curent: <span style={{ color: "#4CAF7D" }}>{subscriptionTier === "clinic" ? "Clinic ✓" : "Premium ✓"}</span>
+                </p>
+                {subscriptionEndDate && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Activ până la: {new Date(subscriptionEndDate).toLocaleDateString("ro-RO")}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {subscriptionTier === "clinic" ? "€24.99/lună" : "€9.99/lună"}
+                </p>
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: "#E8F8F7", color: "#2D7D6F" }}>
+                {subscriptionStatus === "active" ? "Activ" : subscriptionStatus}
+              </span>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={handleOpenPortal}
+                disabled={portalLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors active:scale-95"
+              >
+                <ExternalLink size={14} />
+                {portalLoading ? "Se încarcă…" : "Gestionează abonamentul"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Plan curent: <span className="text-muted-foreground">Free</span></p>
+              <p className="text-xs text-muted-foreground mt-0.5">Upgrade la Premium pentru funcții complete</p>
+            </div>
+            <button
+              onClick={() => navigate("/pricing")}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors active:scale-95"
+              style={{ backgroundColor: "#2D7D6F" }}
+            >
+              <ExternalLink size={14} />
+              Vezi planurile →
+            </button>
+            {import.meta.env.DEV && (
+              <button
+                onClick={handleActivatePremiumDemo}
+                disabled={demoActivating}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-dashed border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors active:scale-95"
+              >
+                🧪 {demoActivating ? "Se activează…" : "Activează Premium Demo"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* ─── INCOMPLETE PROFILE BANNER ─── */}
       {!intakeSurveyCompleted && (
         <button onClick={() => navigate("/onboarding")} className="w-full rounded-xl p-4 flex items-center gap-3 text-left transition-colors hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: "#FFF9E6", border: "1px solid #FCD34D" }}>
@@ -261,7 +356,7 @@ export default function SettingsPage() {
       )}
 
       {/* ─── DEVICE CARD ─── */}
-      <div className="bg-card rounded-xl p-6 card-physiological slide-up" style={{ animationDelay: "120ms" }}>
+      <div className="relative bg-card rounded-xl p-6 card-physiological slide-up" style={{ animationDelay: "120ms" }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-heading font-semibold text-base">{t("settings.device")}</h3>
           <span className={`text-sm font-medium ${deviceConnected ? "text-success" : "text-muted-foreground"}`}>
@@ -297,6 +392,24 @@ export default function SettingsPage() {
             {t("settings.disconnectDevice")}
           </button>
         </div>
+        {!isPremium && (
+          <div className="absolute inset-0 rounded-xl flex flex-col items-center justify-center gap-3 backdrop-blur-[2px]" style={{ backgroundColor: "rgba(255,255,255,0.82)" }}>
+            <div className="p-3 rounded-full" style={{ backgroundColor: "#E8F8F7" }}>
+              <Lock size={20} style={{ color: "#2D7D6F" }} />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold" style={{ color: "#1A4040" }}>Disponibil în Premium</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Conectare iPhone + Apple Watch</p>
+            </div>
+            <button
+              onClick={() => navigate("/pricing")}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-white active:scale-95"
+              style={{ backgroundColor: "#2D7D6F" }}
+            >
+              Upgrade
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ─── NOTIFICATIONS CARD ─── */}
@@ -367,13 +480,25 @@ export default function SettingsPage() {
           <PillRadio options={["30 days", "60 days", "90 days"]} value={retention} onChange={(v) => updatePrefs({ retention: v })} />
         </div>
 
-        <button
-          onClick={handleExport}
-          className="w-full py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center justify-center gap-2"
-        >
-          <Download size={16} />
-          {t("settings.exportData")}
-        </button>
+        {isPremium ? (
+          <button
+            onClick={handleExport}
+            className="w-full py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center justify-center gap-2"
+          >
+            <Download size={16} />
+            {t("settings.exportData")}
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate("/pricing")}
+            className="w-full py-2.5 rounded-xl text-sm font-medium border border-border flex items-center justify-center gap-2 cursor-pointer"
+            style={{ color: "#9CA3AF" }}
+            title="Disponibil în Premium"
+          >
+            <Lock size={16} />
+            {t("settings.exportData")} — Premium
+          </button>
+        )}
 
         {selfReportCount === 0 && (
           <button

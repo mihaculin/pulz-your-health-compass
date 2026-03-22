@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { THEMES } from "@/lib/theme";
 import { playAlert } from "@/lib/playAlert";
+import { useSubscription } from "@/hooks/useSubscription";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 const themes = THEMES.map((t) => ({ ...t, from: t.aqua, to: t.lavender }));
 
@@ -66,6 +68,8 @@ export default function Personalise() {
   const { toast } = useToast();
   const { personalisation, updatePersonalisation } = useApp();
   const { t } = useLanguage();
+  const { isPremium } = useSubscription();
+  const [upgradeModal, setUpgradeModal] = useState<string | null>(null);
 
   const defaultMessages = [
     { label: t("personalise.whenGrounding"), text: "Take a slow breath. You're safe right now." },
@@ -214,18 +218,28 @@ export default function Personalise() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {themes.map((th) => {
             const active = selectedTheme === th.id;
+            const locked = !isPremium && th.id !== "aqua-bloom";
             return (
-              <button key={th.id} onClick={() => selectTheme(th)} className={`rounded-xl overflow-hidden transition-all duration-200 active:scale-[0.97] ${active ? "ring-[3px] ring-primary" : "ring-1 ring-border/60 hover:ring-border"}`}>
+              <button
+                key={th.id}
+                onClick={() => locked ? setUpgradeModal("Teme și culori personalizate") : selectTheme(th)}
+                className={`rounded-xl overflow-hidden transition-all duration-200 active:scale-[0.97] relative ${active ? "ring-[3px] ring-primary" : "ring-1 ring-border/60 hover:ring-border"}`}
+              >
                 <div className="w-full h-20 relative" style={{ background: `linear-gradient(135deg, ${th.from}, ${th.to})` }}>
                   {active && (
                     <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
                       <Check size={12} className="text-primary-foreground" />
                     </div>
                   )}
+                  {locked && (
+                    <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.55)" }}>
+                      <Lock size={18} style={{ color: "#1A4040" }} />
+                    </div>
+                  )}
                 </div>
                 <div className="p-2.5 text-left">
                   <p className="text-sm font-medium">{th.name}</p>
-                  <p className="text-xs text-muted-foreground">{th.sub}</p>
+                  <p className="text-xs text-muted-foreground">{locked ? "Premium" : th.sub}</p>
                 </div>
               </button>
             );
@@ -438,6 +452,10 @@ export default function Personalise() {
           </span>
         )}
       </div>
+
+      {upgradeModal && (
+        <UpgradeModal feature={upgradeModal} onClose={() => setUpgradeModal(null)} />
+      )}
     </div>
   );
 }

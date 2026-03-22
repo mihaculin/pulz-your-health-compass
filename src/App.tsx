@@ -17,6 +17,8 @@ import Progress from "./pages/Progress";
 import SettingsPage from "./pages/Settings";
 import Personalise from "./pages/Personalise";
 import Onboarding from "./pages/Onboarding";
+import Pricing from "./pages/Pricing";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +48,9 @@ function AppRoutes() {
       <Route path="/progress" element={<ProtectedRoute><AppLayout><Progress /></AppLayout></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><AppLayout><SettingsPage /></AppLayout></ProtectedRoute>} />
       <Route path="/personalise" element={<ProtectedRoute><AppLayout><Personalise /></AppLayout></ProtectedRoute>} />
+
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/payment/success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
