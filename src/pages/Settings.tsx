@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { User, Bell, Shield, SlidersHorizontal, Trash2, Download, AlertTriangle, ClipboardList } from "lucide-react";
+import { User, Bell, Shield, SlidersHorizontal, Trash2, Download, AlertTriangle, ClipboardList, RefreshCw, Unplug, FlaskConical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
 import { LangCode } from "@/translations";
+import { seedTestData } from "@/utils/seedTestData";
 
 const DEFAULT_PREFS = {
   interventions: true,
@@ -15,20 +17,23 @@ const DEFAULT_PREFS = {
   checkinTime: "09:00",
   retention: "90 days",
   sharing: { episodes: true, journal: true, biometrics: true },
-  theme: "Light",
-  fontSize: "Default",
 };
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { fullName, initials, joinedWeeksAgo, personalisation, updatePersonalisation, dateOfBirth, primaryConcerns, heightCm, weightKg, conditions, intakeSurveyCompleted, appLoading } = useApp();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { t, language, setLanguage } = useLanguage();
+  const { toast } = useToast();
 
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
-  const [device, setDevice] = useState<{ deviceType: string; lastSync: string | null; isActive: boolean | null } | null>(null);
-
+  const [device, setDevice] = useState<{ id: string; deviceType: string; lastSync: string | null; isActive: boolean | null } | null>(null);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [selfReportCount, setSelfReportCount] = useState<number | null>(null);
+
   const notifs = {
     interventions: prefs.interventions,
     dailyCheckin: prefs.dailyCheckin,
@@ -37,28 +42,16 @@ export default function SettingsPage() {
   };
   const checkinTime = prefs.checkinTime;
   const retention = prefs.retention;
-  const sharing = prefs.sharing;
-  const theme = prefs.theme;
-  const fontSize = prefs.fontSize;
 
   const updatePrefs = async (patch: Partial<typeof DEFAULT_PREFS>) => {
     const next = {
       ...prefs,
       ...patch,
-      sharing: {
-        ...prefs.sharing,
-        ...(patch.sharing ?? {}),
-      },
+      sharing: { ...prefs.sharing, ...(patch.sharing ?? {}) },
     };
     setPrefs(next);
     if (!user) return;
-    await supabase
-      .from("profiles")
-      .update({
-        notification_preferences: next,
-        theme_preference: next.theme,
-      })
-      .eq("user_id", user.id);
+    await supabase.from("profiles").update({ notification_preferences: next }).eq("user_id", user.id);
   };
 
   const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
@@ -77,9 +70,7 @@ export default function SettingsPage() {
         <button
           key={opt}
           onClick={() => onChange(opt)}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 ${
-            value === opt ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground"
-          }`}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 ${value === opt ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground"}`}
         >
           {opt}
         </button>
@@ -92,92 +83,118 @@ export default function SettingsPage() {
     let cancelled = false;
 
     const load = async () => {
-      const [profileRes, deviceRes] = await Promise.all([
-        supabase.from("profiles").select("notification_preferences, theme_preference").eq("user_id", user.id).maybeSingle(),
-        supabase
-          .from("device_connections")
-          .select("device_type, last_sync, is_active")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+      const [profileRes, deviceRes, countRes] = await Promise.all([
+        supabase.from("profiles").select("notification_preferences").eq("user_id", user.id).maybeSingle(),
+        supabase.from("device_connections").select("id, device_type, last_sync, is_active").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("self_reports").select("id", { count: "exact", head: true }).eq("user_id", user.id),
       ]);
 
       if (cancelled) return;
 
       const rawPrefs = (profileRes.data?.notification_preferences as Partial<typeof DEFAULT_PREFS>) ?? {};
-      const nextPrefs = {
-        ...DEFAULT_PREFS,
-        ...rawPrefs,
-        sharing: {
-          ...DEFAULT_PREFS.sharing,
-          ...(rawPrefs.sharing ?? {}),
-        },
-      };
-      if (profileRes.data?.theme_preference) {
-        nextPrefs.theme = profileRes.data.theme_preference;
-      }
-      setPrefs(nextPrefs);
+      setPrefs({ ...DEFAULT_PREFS, ...rawPrefs, sharing: { ...DEFAULT_PREFS.sharing, ...(rawPrefs.sharing ?? {}) } });
 
       if (deviceRes.data) {
-        setDevice({
-          deviceType: deviceRes.data.device_type,
-          lastSync: deviceRes.data.last_sync,
-          isActive: deviceRes.data.is_active,
-        });
+        setDevice({ id: deviceRes.data.id, deviceType: deviceRes.data.device_type, lastSync: deviceRes.data.last_sync, isActive: deviceRes.data.is_active });
       } else {
         setDevice(null);
       }
+
+      setSelfReportCount(countRes.count ?? 0);
     };
 
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [user]);
+
+  const deviceConnected = device?.isActive ?? false;
+  const deviceName = device?.deviceType ?? "No device connected";
+  const lastSyncLabel = device?.lastSync ? new Date(device.lastSync).toLocaleString() : "—";
+
+  const handleSyncNow = async () => {
+    if (!user || !device) return;
+    setSyncing(true);
+    await supabase.from("device_connections").update({ last_sync: new Date().toISOString() }).eq("id", device.id);
+    setDevice((d) => d ? { ...d, lastSync: new Date().toISOString() } : d);
+    toast({ description: "Synced!", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+    setSyncing(false);
+  };
+
+  const handleDisconnect = async () => {
+    if (!user || !device) return;
+    await supabase.from("device_connections").update({ is_active: false }).eq("id", device.id);
+    setDevice(null);
+    toast({ description: "Device disconnected", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+  };
+
+  const handleExport = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("self_reports")
+      .select("timestamp, urge_level, triggers, emotional_state, notes")
+      .eq("user_id", user.id)
+      .order("timestamp", { ascending: false });
+
+    const csv = [
+      "Date,Urge Level,Triggers,Emotions,Notes",
+      ...(data ?? []).map((r) =>
+        `${r.timestamp},${r.urge_level ?? ""},"${(r.triggers ?? []).join(";")}","${(r.emotional_state ?? []).join(";")}","${(r.notes ?? "").replace(/"/g, "'")}"`
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pulz-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ description: "Export downloaded", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+  };
+
+  const handleDeleteAll = async () => {
+    if (!user) return;
+    setDeleting(true);
+    await Promise.all([
+      supabase.from("self_reports").delete().eq("user_id", user.id),
+      supabase.from("risk_windows").delete().eq("user_id", user.id),
+      supabase.from("intervention_events").delete().eq("user_id", user.id),
+      supabase.from("sensor_samples").delete().eq("user_id", user.id),
+      supabase.from("personalisation_settings").delete().eq("user_id", user.id),
+    ]);
+    setDeleting(false);
+    setDeleteModal(false);
+    await signOut();
+    navigate("/");
+  };
+
+  const handleSeedData = async () => {
+    if (!user) return;
+    setSeeding(true);
+    await seedTestData(user.id);
+    setSelfReportCount(999);
+    toast({ description: "14 days of test data loaded ✅", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+    setSeeding(false);
+  };
 
   const age = (() => {
     if (!dateOfBirth) return null;
     const raw = dateOfBirth.trim();
     if (!raw) return null;
-
     let dob: Date | null = null;
     const match = /^(\d{2,4})[\/.-](\d{2})[\/.-](\d{2,4})$/.exec(raw);
     if (match) {
-      const a = Number(match[1]);
-      const b = Number(match[2]);
-      const c = Number(match[3]);
-      if (match[1].length === 4) {
-        const y = a;
-        const m = b;
-        const d = c;
-        dob = new Date(Date.UTC(y, m - 1, d));
-      } else if (match[3].length === 4) {
-        const d = a;
-        const m = b;
-        const y = c;
-        dob = new Date(Date.UTC(y, m - 1, d));
-      }
+      const a = Number(match[1]), b = Number(match[2]), c = Number(match[3]);
+      if (match[1].length === 4) dob = new Date(Date.UTC(a, b - 1, c));
+      else if (match[3].length === 4) dob = new Date(Date.UTC(c, b - 1, a));
     }
-
-    if (!dob) {
-      const parsed = new Date(raw);
-      if (!Number.isNaN(parsed.getTime())) dob = parsed;
-    }
-
+    if (!dob) { const p = new Date(raw); if (!Number.isNaN(p.getTime())) dob = p; }
     if (!dob) return null;
-
     const today = new Date();
-    const yearDiff = today.getFullYear() - dob.getUTCFullYear();
-    const monthDiff = today.getMonth() - dob.getUTCMonth();
-    const dayDiff = today.getDate() - dob.getUTCDate();
-    let years = yearDiff;
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) years -= 1;
+    let years = today.getFullYear() - dob.getUTCFullYear();
+    if (today.getMonth() - dob.getUTCMonth() < 0 || (today.getMonth() === dob.getUTCMonth() && today.getDate() < dob.getUTCDate())) years -= 1;
     return years;
   })();
-  const deviceConnected = device?.isActive ?? false;
-  const deviceName = device?.deviceType ?? "No device connected";
-  const lastSyncLabel = device?.lastSync ? new Date(device.lastSync).toLocaleString() : "—";
 
   if (appLoading) {
     return (
@@ -186,9 +203,7 @@ export default function SettingsPage() {
           <h1 className="text-2xl lg:text-3xl font-heading font-semibold">{t("settings.title")}</h1>
           <p className="text-muted-foreground mt-1 text-sm">{t("settings.subtitle")}</p>
         </div>
-        {[120, 80, 80, 60].map((h, i) => (
-          <div key={i} className="bg-muted rounded-xl animate-pulse" style={{ height: h }} />
-        ))}
+        {[120, 80, 80, 60].map((h, i) => <div key={i} className="bg-muted rounded-xl animate-pulse" style={{ height: h }} />)}
       </div>
     );
   }
@@ -202,15 +217,9 @@ export default function SettingsPage() {
       </div>
 
       {/* ─── PROFILE CARD ─── */}
-      <div
-        className="rounded-xl p-6 card-shadow slide-up"
-        style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec", animationDelay: "60ms" }}
-      >
+      <div className="rounded-xl p-6 card-shadow slide-up" style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec", animationDelay: "60ms" }}>
         <div className="flex items-center gap-4">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center font-heading font-bold text-2xl shrink-0"
-            style={{ backgroundColor: "#D7C9DB", color: "#3A2845" }}
-          >
+          <div className="w-20 h-20 rounded-full flex items-center justify-center font-heading font-bold text-2xl shrink-0" style={{ backgroundColor: "#D7C9DB", color: "#3A2845" }}>
             {initials || "U"}
           </div>
           <div className="min-w-0">
@@ -218,9 +227,7 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground">{t("settings.personalData.age")} {age ?? "—"}</p>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {primaryConcerns.length > 0 ? (
-                primaryConcerns.map((c) => (
-                  <span key={c} className="chip-trigger px-2.5 py-1 rounded-full text-xs">{c}</span>
-                ))
+                primaryConcerns.map((c) => <span key={c} className="chip-trigger px-2.5 py-1 rounded-full text-xs">{c}</span>)
               ) : intakeSurveyCompleted ? (
                 <span className="text-xs text-muted-foreground">{t("settings.personalData.noConcerns")}</span>
               ) : (
@@ -229,16 +236,12 @@ export default function SettingsPage() {
             </div>
             {(heightCm || weightKg) && (
               <p className="text-xs text-muted-foreground mt-1">
-                {heightCm ? `${heightCm} cm` : ""}
-                {heightCm && weightKg ? " · " : ""}
-                {weightKg ? `${weightKg} kg` : ""}
+                {heightCm ? `${heightCm} cm` : ""}{heightCm && weightKg ? " · " : ""}{weightKg ? `${weightKg} kg` : ""}
               </p>
             )}
             {conditions.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {conditions.map((c) => (
-                  <span key={c} className="chip-biometric px-2.5 py-1 rounded-full text-xs">{c}</span>
-                ))}
+                {conditions.map((c) => <span key={c} className="chip-biometric px-2.5 py-1 rounded-full text-xs">{c}</span>)}
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-2">{t("settings.startedLabel")} {joinedWeeksAgo} {t("settings.personalData.weeksAgo")}</p>
@@ -248,11 +251,7 @@ export default function SettingsPage() {
 
       {/* ─── INCOMPLETE PROFILE BANNER ─── */}
       {!intakeSurveyCompleted && (
-        <button
-          onClick={() => navigate("/onboarding")}
-          className="w-full rounded-xl p-4 flex items-center gap-3 text-left transition-colors hover:opacity-90 active:scale-[0.98]"
-          style={{ backgroundColor: "#FFF9E6", border: "1px solid #FCD34D" }}
-        >
+        <button onClick={() => navigate("/onboarding")} className="w-full rounded-xl p-4 flex items-center gap-3 text-left transition-colors hover:opacity-90 active:scale-[0.98]" style={{ backgroundColor: "#FFF9E6", border: "1px solid #FCD34D" }}>
           <ClipboardList size={18} style={{ color: "#B45309" }} />
           <div className="min-w-0">
             <p className="text-sm font-medium" style={{ color: "#B45309" }}>{t("settings.completeHealthProfile")}</p>
@@ -274,25 +273,27 @@ export default function SettingsPage() {
           <span>{t("settings.battery")}: —</span>
         </div>
         <div className="flex flex-wrap gap-1.5 mb-5">
-          {deviceConnected ? (
-            <span className="chip-biometric px-2.5 py-1 rounded-full text-xs">{t("settings.syncActive")}</span>
-          ) : (
-            <span className="text-xs text-muted-foreground">{t("settings.noDeviceData")}</span>
-          )}
+          {deviceConnected
+            ? <span className="chip-biometric px-2.5 py-1 rounded-full text-xs">{t("settings.syncActive")}</span>
+            : <span className="text-xs text-muted-foreground">{t("settings.noDeviceData")}</span>}
         </div>
         <div className="flex gap-3">
           <button
-            disabled={!deviceConnected}
-            className="px-4 py-2 rounded-xl text-sm font-medium active:scale-95 transition-transform"
-            style={{ backgroundColor: "#b3ecec", color: "#1A4040", opacity: deviceConnected ? 1 : 0.6 }}
+            onClick={handleSyncNow}
+            disabled={!deviceConnected || syncing}
+            className="px-4 py-2 rounded-xl text-sm font-medium active:scale-95 transition-all flex items-center gap-2"
+            style={{ backgroundColor: "#b3ecec", color: "#1A4040", opacity: deviceConnected ? 1 : 0.5 }}
           >
-            {t("settings.syncNow")}
+            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Syncing…" : t("settings.syncNow")}
           </button>
           <button
+            onClick={handleDisconnect}
             disabled={!deviceConnected}
-            className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95"
-            style={{ opacity: deviceConnected ? 1 : 0.6 }}
+            className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center gap-2"
+            style={{ opacity: deviceConnected ? 1 : 0.5 }}
           >
+            <Unplug size={14} />
             {t("settings.disconnectDevice")}
           </button>
         </div>
@@ -302,7 +303,6 @@ export default function SettingsPage() {
       <div className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-1 slide-up" style={{ animationDelay: "180ms" }}>
         <h3 className="font-heading font-semibold text-base mb-4">{t("settings.notifications")}</h3>
 
-        {/* Intervention alerts */}
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <AlertTriangle size={18} className="text-muted-foreground" />
@@ -311,7 +311,6 @@ export default function SettingsPage() {
           <Toggle on={notifs.interventions} onToggle={() => updatePrefs({ interventions: !notifs.interventions })} />
         </div>
 
-        {/* Daily check-in */}
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <Bell size={18} className="text-muted-foreground" />
@@ -319,18 +318,12 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center gap-2">
             {notifs.dailyCheckin && (
-              <input
-                type="time"
-                value={checkinTime}
-                onChange={(e) => updatePrefs({ checkinTime: e.target.value })}
-                className="rounded-lg border border-border px-2 py-1 text-xs font-mono focus:outline-none focus:border-[#b3ecec] transition"
-              />
+              <input type="time" value={checkinTime} onChange={(e) => updatePrefs({ checkinTime: e.target.value })} className="rounded-lg border border-border px-2 py-1 text-xs font-mono focus:outline-none focus:border-[#b3ecec] transition" />
             )}
             <Toggle on={notifs.dailyCheckin} onToggle={() => updatePrefs({ dailyCheckin: !notifs.dailyCheckin })} />
           </div>
         </div>
 
-        {/* Weekly summary */}
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <Download size={18} className="text-muted-foreground" />
@@ -339,7 +332,6 @@ export default function SettingsPage() {
           <Toggle on={notifs.weeklySummary} onToggle={() => updatePrefs({ weeklySummary: !notifs.weeklySummary })} />
         </div>
 
-        {/* Specialist messages */}
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <User size={18} className="text-muted-foreground" />
@@ -348,7 +340,6 @@ export default function SettingsPage() {
           <Toggle on={notifs.specialistMsg} onToggle={() => updatePrefs({ specialistMsg: !notifs.specialistMsg })} />
         </div>
 
-        {/* Sound */}
         <div className="flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
             <Bell size={18} className="text-muted-foreground" />
@@ -357,10 +348,7 @@ export default function SettingsPage() {
           <Toggle on={personalisation.soundEnabled} onToggle={() => updatePersonalisation({ soundEnabled: !personalisation.soundEnabled })} />
         </div>
 
-        <div
-          className="mt-2 rounded-xl px-4 py-3 text-xs"
-          style={{ backgroundColor: "#EEF3FB", color: "#4A5568" }}
-        >
+        <div className="mt-2 rounded-xl px-4 py-3 text-xs" style={{ backgroundColor: "#EEF3FB", color: "#4A5568" }}>
           {t("settings.notificationsNote")}
         </div>
       </div>
@@ -379,10 +367,24 @@ export default function SettingsPage() {
           <PillRadio options={["30 days", "60 days", "90 days"]} value={retention} onChange={(v) => updatePrefs({ retention: v })} />
         </div>
 
-        <button className="w-full py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center justify-center gap-2">
+        <button
+          onClick={handleExport}
+          className="w-full py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center justify-center gap-2"
+        >
           <Download size={16} />
           {t("settings.exportData")}
         </button>
+
+        {selfReportCount === 0 && (
+          <button
+            onClick={handleSeedData}
+            disabled={seeding}
+            className="w-full py-2.5 rounded-xl text-sm font-medium border border-dashed border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95 flex items-center justify-center gap-2"
+          >
+            <FlaskConical size={16} />
+            {seeding ? "Loading test data…" : "Load test data (14 days)"}
+          </button>
+        )}
 
         <button
           onClick={() => setDeleteModal(true)}
@@ -398,17 +400,10 @@ export default function SettingsPage() {
         <div className="rounded-xl p-6 card-shadow slide-up" style={{ backgroundColor: "#FFF5F5", border: "1px solid #FECACA", animationDelay: "330ms" }}>
           <h3 className="font-heading font-semibold text-base mb-3">{t("settings.crisisContact")}</h3>
           <div className="space-y-1">
-            {personalisation.crisisContactName && (
-              <p className="text-sm font-medium">{personalisation.crisisContactName}</p>
-            )}
-            {personalisation.crisisContactPhone && (
-              <p className="text-sm text-muted-foreground">{personalisation.crisisContactPhone}</p>
-            )}
+            {personalisation.crisisContactName && <p className="text-sm font-medium">{personalisation.crisisContactName}</p>}
+            {personalisation.crisisContactPhone && <p className="text-sm text-muted-foreground">{personalisation.crisisContactPhone}</p>}
           </div>
-          <button
-            onClick={() => navigate("/personalise")}
-            className="mt-3 text-xs text-muted-foreground hover:underline"
-          >
+          <button onClick={() => navigate("/personalise")} className="mt-3 text-xs text-muted-foreground hover:underline">
             {t("settings.editPersonalise")}
           </button>
         </div>
@@ -418,41 +413,25 @@ export default function SettingsPage() {
       <div className="bg-card rounded-xl p-6 card-shadow border border-border/50 space-y-5 slide-up" style={{ animationDelay: "360ms" }}>
         <h3 className="font-heading font-semibold text-base">{t("settings.appearance")}</h3>
 
-        {/* Link to Personalise */}
         <button
           onClick={() => navigate("/personalise")}
           className="w-full rounded-xl p-4 text-left flex items-center gap-3 transition-colors hover:opacity-90 active:scale-[0.98]"
           style={{ backgroundColor: "#E8F8F7", border: "1px solid #b3ecec" }}
         >
           <SlidersHorizontal size={18} style={{ color: "#2D7D6F" }} />
-          <span className="text-sm font-medium" style={{ color: "#2D7D6F" }}>
-            {t("settings.themeSettings")}
-          </span>
+          <span className="text-sm font-medium" style={{ color: "#2D7D6F" }}>{t("settings.themeSettings")}</span>
         </button>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t("settings.theme")}</label>
-          <PillRadio options={["Light", "Dark", "System"]} value={theme} onChange={(v) => updatePrefs({ theme: v })} />
-        </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">{t("settings.language")}</label>
           <select
             value={language}
-            onChange={(e) => {
-              updatePersonalisation({ language: e.target.value });
-              setLanguage(e.target.value as LangCode);
-            }}
+            onChange={(e) => { updatePersonalisation({ language: e.target.value }); setLanguage(e.target.value as LangCode); }}
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#b3ecec] focus:ring-2 focus:ring-[#b3ecec]/30 transition"
           >
             <option value="en">English</option>
             <option value="ro">Română</option>
           </select>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t("settings.fontSize")}</label>
-          <PillRadio options={["Default", "Large"]} value={fontSize} onChange={(v) => updatePrefs({ fontSize: v })} />
         </div>
       </div>
 
@@ -460,31 +439,28 @@ export default function SettingsPage() {
       {deleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/20" onClick={() => setDeleteModal(false)} />
-          <div
-            className="relative bg-card rounded-2xl p-6 max-w-sm mx-4 card-shadow space-y-4"
-            style={{ animation: "slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1) both" }}
-          >
+          <div className="relative bg-card rounded-2xl p-6 max-w-sm mx-4 card-shadow space-y-4" style={{ animation: "slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1) both" }}>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-destructive/10">
-                <Trash2 size={18} className="text-destructive" />
-              </div>
+              <div className="p-2 rounded-lg bg-destructive/10"><Trash2 size={18} className="text-destructive" /></div>
               <h3 className="font-heading font-semibold">{t("settings.deleteModal.title")}</h3>
             </div>
             <p className="text-sm text-muted-foreground">
-              {t("settings.deleteModal.body")}
+              This will permanently delete all your journal entries, progress data, and settings. This cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setDeleteModal(false)}
+                disabled={deleting}
                 className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors active:scale-95"
               >
                 {t("settings.deleteModal.cancel")}
               </button>
               <button
-                onClick={() => setDeleteModal(false)}
+                onClick={handleDeleteAll}
+                disabled={deleting}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-destructive hover:bg-destructive/90 transition-colors active:scale-95"
               >
-                {t("settings.deleteModal.confirm")}
+                {deleting ? "Deleting…" : t("settings.deleteModal.confirm")}
               </button>
             </div>
           </div>
