@@ -18,6 +18,7 @@ import SettingsPage from "./pages/Settings";
 import Personalise from "./pages/Personalise";
 import Onboarding from "./pages/Onboarding";
 import Pricing from "./pages/Pricing";
+import Checkout from "./pages/Checkout";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 
@@ -50,6 +51,7 @@ function AppRoutes() {
       <Route path="/personalise" element={<ProtectedRoute><AppLayout><Personalise /></AppLayout></ProtectedRoute>} />
 
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/checkout" element={<Checkout />} />
       <Route path="/payment/success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
 
       <Route path="*" element={<NotFound />} />

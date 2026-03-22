@@ -1,250 +1,208 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, X as XIcon, ArrowLeft } from "lucide-react";
+import { Check, X as XIcon, Lock, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 const FREE_FEATURES = [
   { label: "Journal nelimitat", included: true },
   { label: "Tabel Fairburn zilnic", included: true },
-  { label: "Progress 7 zile", included: true },
-  { label: "Language RO/EN", included: true },
-  { label: "Conectare Apple Watch", included: false },
+  { label: "Progress ultimele 7 zile", included: true },
+  { label: "Română / Engleză", included: true },
+  { label: "Apple Watch sync", included: false },
   { label: "Notificații inteligente", included: false },
+  { label: "Progress complet + insights", included: false },
+  { label: "Export date CSV", included: false },
   { label: "Personalizare completă", included: false },
-  { label: "Export date", included: false },
 ];
 
 const PREMIUM_FEATURES = [
-  { label: "Tot din Free", included: true },
-  { label: "Conectare iPhone + Apple Watch", included: true },
-  { label: "Notificații cu sunet personalizat", included: true },
-  { label: "Progress nelimitat + insights", included: true },
-  { label: "Personalizare teme și mesaje", included: true },
-  { label: "Export CSV", included: true },
-  { label: "Pattern detection", included: true },
+  { label: "Tot ce e în Free" },
+  { label: "Conectare iPhone + Apple Watch" },
+  { label: "Notificații cu sunet personalizat" },
+  { label: "Progress complet + pattern insights" },
+  { label: "Export date CSV" },
+  { label: "Personalizare teme și mesaje" },
+  { label: "Suport prioritar" },
 ];
-
-const CLINIC_FEATURES = [
-  { label: "Tot din Premium", included: true },
-  { label: "Rapoarte clinice PDF", included: true },
-  { label: "Suport prioritar 24h", included: true },
-  { label: "Viitoare: dashboard specialist", included: true },
-];
-
-function FeatureRow({ label, included }: { label: string; included: boolean }) {
-  return (
-    <div className="flex items-start gap-2.5 py-1.5">
-      {included ? (
-        <Check size={15} className="shrink-0 mt-0.5" style={{ color: "#4CAF7D" }} />
-      ) : (
-        <XIcon size={15} className="shrink-0 mt-0.5" style={{ color: "#E5E7EB" }} />
-      )}
-      <span className="text-sm" style={{ color: included ? "#374151" : "#9CA3AF" }}>{label}</span>
-    </div>
-  );
-}
 
 export default function Pricing() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isPremium, isClinic } = useSubscription();
-  const { toast } = useToast();
+  const { isPremium } = useSubscription();
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
-  const [loading, setLoading] = useState<string | null>(null);
 
-  const handleUpgrade = async (plan: "premium" | "clinic") => {
-    if (!user) {
-      navigate("/signin");
-      return;
-    }
-    setLoading(plan);
-    try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { plan, userId: user.id, userEmail: user.email, billingPeriod: billing },
-      });
-      if (error || !data?.url) throw new Error(error?.message ?? "No checkout URL returned");
-      window.location.href = data.url;
-    } catch {
-      toast({ description: "Could not start checkout. Try again.", className: "bg-white border-l-2 border-l-red-300" });
-      setLoading(null);
-    }
+  const monthlyPrice = billing === "monthly" ? "€9.99" : "€6.58";
+
+  const handleStartPremium = () => {
+    navigate(`/checkout?plan=premium&billing=${billing}`);
   };
-
-  const premiumPrice = billing === "monthly" ? "€9.99" : "€8.33";
-  const clinicPrice = billing === "monthly" ? "€24.99" : "€20.83";
-  const premiumAnnual = "€99.90";
-  const clinicAnnual = "€249.90";
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F9FAFB" }}>
-      {/* Header */}
-      <div className="max-w-5xl mx-auto px-6 pt-8 pb-2 flex items-center justify-between">
+      {/* Header bar */}
+      <div className="max-w-4xl mx-auto px-6 pt-7 flex items-center justify-between">
         <button
           onClick={() => navigate(user ? "/dashboard" : "/")}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft size={16} />
-          {user ? "Înapoi la aplicație" : "Înapoi"}
+          <ArrowLeft size={15} />
+          {user ? "Înapoi" : "Acasă"}
         </button>
-        <span className="text-xl font-heading font-bold text-primary">PULZ</span>
+        <span className="text-lg font-heading font-bold text-primary">PULZ</span>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-10">
+      <div className="max-w-4xl mx-auto px-6 py-12 space-y-10">
         {/* Title */}
-        <div className="text-center space-y-3">
-          <h1 className="text-3xl lg:text-4xl font-heading font-bold" style={{ color: "#1A4040" }}>
-            Prețuri simple și corecte
+        <div className="text-center space-y-2">
+          <h1
+            className="font-heading font-bold"
+            style={{ fontSize: 32, color: "#1A1F2E", fontFamily: "Fraunces, serif" }}
+          >
+            Alege planul tău
           </h1>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Alege planul potrivit pentru tine. Poți anula oricând.
+          <p style={{ color: "#6B7280", fontSize: 15 }}>
+            Începe gratuit. Upgradează când ești pregătită.
           </p>
-
-          {/* Billing toggle */}
-          <div className="inline-flex items-center gap-1 bg-white rounded-xl border border-border p-1 mt-4">
-            <button
-              onClick={() => setBilling("monthly")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${billing === "monthly" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              Lunar
-            </button>
-            <button
-              onClick={() => setBilling("annual")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${billing === "annual" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              Anual
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: billing === "annual" ? "rgba(255,255,255,0.25)" : "#b3ecec", color: billing === "annual" ? "#fff" : "#1A4040" }}>
-                -17%
-              </span>
-            </button>
-          </div>
         </div>
 
-        {/* Plan cards */}
-        <div className="grid md:grid-cols-3 gap-6 items-stretch">
+        {/* Cards */}
+        <div className="grid md:grid-cols-2 gap-6 items-stretch">
 
           {/* FREE */}
-          <div className="bg-white rounded-2xl p-6 flex flex-col" style={{ border: "1px solid #E5E7EB" }}>
-            <div className="mb-5">
-              <h2 className="font-heading text-[22px] font-bold mb-3" style={{ color: "#1A4040" }}>Free</h2>
-              <div className="flex items-end gap-1">
-                <span className="text-4xl font-mono font-bold" style={{ color: "#1A4040" }}>€0</span>
-                <span className="text-muted-foreground text-sm mb-1">/lună</span>
+          <div
+            className="flex flex-col"
+            style={{ backgroundColor: "#fff", border: "1px solid #E8EAED", borderRadius: 20, padding: 32 }}
+          >
+            <div className="mb-6">
+              <p style={{ fontSize: 14, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 500 }}>
+                Free
+              </p>
+              <div className="flex items-end gap-1 mt-2">
+                <span style={{ fontFamily: "DM Mono, monospace", fontSize: 48, fontWeight: 700, color: "#1A1F2E", lineHeight: 1 }}>
+                  €0
+                </span>
+                <span style={{ fontSize: 14, color: "#6B7280", marginBottom: 6 }}>/lună</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Mereu gratuit</p>
             </div>
 
-            <div className="border-t border-border/50 pt-4 mb-6 space-y-0.5 flex-1">
-              {FREE_FEATURES.map((f) => <FeatureRow key={f.label} {...f} />)}
+            <div className="border-t border-border/40 pt-5 mb-6 flex-1 space-y-2.5">
+              {FREE_FEATURES.map((f) => (
+                <div key={f.label} className="flex items-center gap-2.5">
+                  {f.included ? (
+                    <Check size={15} style={{ color: "#4CAF7D", flexShrink: 0 }} />
+                  ) : (
+                    <XIcon size={15} style={{ color: "#D1D5DB", flexShrink: 0 }} />
+                  )}
+                  <span
+                    style={{
+                      fontSize: 14,
+                      color: f.included ? "#374151" : "#9CA3AF",
+                      textDecoration: f.included ? "none" : "none",
+                    }}
+                  >
+                    {f.label}
+                  </span>
+                </div>
+              ))}
             </div>
 
             <button
-              onClick={() => navigate(user ? "/dashboard" : "/signup")}
-              className="w-full py-3 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors active:scale-[0.98]"
+              disabled
+              className="w-full py-3 rounded-xl text-sm font-medium"
+              style={{ backgroundColor: "#F3F4F6", color: "#9CA3AF", cursor: "default" }}
             >
-              {user ? "Planul tău curent" : "Începe gratuit"}
+              {isPremium ? "Planul de bază" : "Planul tău curent"}
             </button>
           </div>
 
           {/* PREMIUM */}
-          <div className="bg-white rounded-2xl p-6 flex flex-col relative" style={{ border: "2px solid #2D7D6F" }}>
+          <div
+            className="flex flex-col relative"
+            style={{ backgroundColor: "#fff", border: "2px solid #2D7D6F", borderRadius: 20, padding: 32 }}
+          >
+            {/* Badge */}
             <div
-              className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold"
-              style={{ backgroundColor: "#b3ecec", color: "#2D7D6F" }}
+              className="absolute left-1/2 -translate-x-1/2"
+              style={{ top: -14, backgroundColor: "#b3ecec", color: "#2D7D6F", fontSize: 11, fontWeight: 600, padding: "3px 12px", borderRadius: 100 }}
             >
               Cel mai popular
             </div>
 
-            <div className="mb-5">
-              <h2 className="font-heading text-[22px] font-bold mb-3" style={{ color: "#1A4040" }}>Premium</h2>
-              <div className="flex items-end gap-1">
-                <span className="text-4xl font-mono font-bold" style={{ color: "#1A4040" }}>{premiumPrice}</span>
-                <span className="text-muted-foreground text-sm mb-1">/lună</span>
+            <div className="mb-6">
+              <p style={{ fontSize: 14, color: "#2D7D6F", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 500 }}>
+                Premium
+              </p>
+              <div className="flex items-end gap-1 mt-2">
+                <span style={{ fontFamily: "DM Mono, monospace", fontSize: 48, fontWeight: 700, color: "#1A1F2E", lineHeight: 1 }}>
+                  {monthlyPrice}
+                </span>
+                <span style={{ fontSize: 14, color: "#6B7280", marginBottom: 6 }}>/lună</span>
               </div>
-              {billing === "annual" && (
-                <p className="text-xs text-muted-foreground mt-1">sau {premiumAnnual}/an — 2 luni gratuit</p>
-              )}
-              {billing === "monthly" && (
-                <p className="text-xs text-muted-foreground mt-1">sau {premiumAnnual}/an — 2 luni gratuit</p>
+              {billing === "annual" ? (
+                <p style={{ fontSize: 12, color: "#4CAF7D", marginTop: 4 }}>
+                  €79/an —{" "}
+                  <span style={{ textDecoration: "line-through", color: "#9CA3AF" }}>€9.99</span> economie 2 luni
+                </p>
+              ) : (
+                <p style={{ fontSize: 12, color: "#4CAF7D", marginTop: 4 }}>sau €79/an — 2 luni gratuit</p>
               )}
             </div>
 
-            <div className="border-t border-border/50 pt-4 mb-6 space-y-0.5 flex-1">
-              {PREMIUM_FEATURES.map((f) => <FeatureRow key={f.label} {...f} />)}
+            <div className="border-t border-border/40 pt-5 mb-6 flex-1 space-y-2.5">
+              {PREMIUM_FEATURES.map((f) => (
+                <div key={f.label} className="flex items-center gap-2.5">
+                  <Check size={15} style={{ color: "#4CAF7D", flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, color: "#374151" }}>{f.label}</span>
+                </div>
+              ))}
             </div>
 
-            {isPremium && !isClinic ? (
-              <div className="w-full py-3 rounded-xl text-sm font-medium text-center" style={{ backgroundColor: "#E8F8F7", color: "#2D7D6F" }}>
+            {/* Billing toggle */}
+            <div className="flex items-center gap-1 p-1 rounded-xl mb-4" style={{ backgroundColor: "#F3F4F6" }}>
+              {(["monthly", "annual"] as const).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setBilling(b)}
+                  className="flex-1 py-2 rounded-lg text-xs font-medium transition-all"
+                  style={
+                    billing === b
+                      ? { backgroundColor: "#fff", color: "#1A1F2E", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }
+                      : { color: "#6B7280" }
+                  }
+                >
+                  {b === "monthly" ? "Lunar" : "Anual"}
+                </button>
+              ))}
+            </div>
+
+            {isPremium ? (
+              <div
+                className="w-full py-3.5 rounded-xl text-sm font-medium text-center"
+                style={{ backgroundColor: "#E8F8F7", color: "#2D7D6F" }}
+              >
                 Planul tău curent ✓
               </div>
             ) : (
               <button
-                onClick={() => handleUpgrade("premium")}
-                disabled={loading === "premium"}
-                className="w-full py-3 rounded-xl text-sm font-medium text-white transition-colors active:scale-[0.98]"
-                style={{ backgroundColor: "#2D7D6F", opacity: loading === "premium" ? 0.7 : 1 }}
+                onClick={handleStartPremium}
+                className="w-full rounded-xl text-sm font-medium text-white transition-colors active:scale-[0.98]"
+                style={{ backgroundColor: "#2D7D6F", height: 48 }}
               >
-                {loading === "premium" ? "Se încarcă…" : "Începe Premium →"}
-              </button>
-            )}
-          </div>
-
-          {/* CLINIC */}
-          <div className="bg-white rounded-2xl p-6 flex flex-col" style={{ border: "1px solid #D7C9DB" }}>
-            <div className="mb-5">
-              <h2 className="font-heading text-[22px] font-bold mb-3" style={{ color: "#1A4040" }}>Clinic</h2>
-              <div className="flex items-end gap-1">
-                <span className="text-4xl font-mono font-bold" style={{ color: "#1A4040" }}>{clinicPrice}</span>
-                <span className="text-muted-foreground text-sm mb-1">/lună</span>
-              </div>
-              {billing === "annual" && (
-                <p className="text-xs text-muted-foreground mt-1">sau {clinicAnnual}/an — 2 luni gratuit</p>
-              )}
-              {billing === "monthly" && (
-                <p className="text-xs text-muted-foreground mt-1">sau {clinicAnnual}/an — 2 luni gratuit</p>
-              )}
-            </div>
-
-            <div className="border-t border-border/50 pt-4 mb-6 space-y-0.5 flex-1">
-              {CLINIC_FEATURES.map((f) => <FeatureRow key={f.label} {...f} />)}
-            </div>
-
-            {isClinic ? (
-              <div className="w-full py-3 rounded-xl text-sm font-medium text-center" style={{ backgroundColor: "#F4EEF7", color: "#7B5E8A" }}>
-                Planul tău curent ✓
-              </div>
-            ) : (
-              <button
-                onClick={() => handleUpgrade("clinic")}
-                disabled={loading === "clinic"}
-                className="w-full py-3 rounded-xl text-sm font-medium border-2 transition-colors active:scale-[0.98]"
-                style={{ borderColor: "#D7C9DB", color: "#7B5E8A", opacity: loading === "clinic" ? 0.7 : 1 }}
-              >
-                {loading === "clinic" ? "Se încarcă…" : "Începe Clinic →"}
+                Începe Premium →
               </button>
             )}
           </div>
         </div>
 
-        {/* DEV test card info */}
-        {import.meta.env.DEV && (
-          <div
-            className="rounded-2xl p-4 text-sm flex items-start gap-3"
-            style={{ backgroundColor: "#FFFBEB", border: "1px solid #FCD34D" }}
-          >
-            <span className="text-lg">🧪</span>
-            <div>
-              <p className="font-medium text-amber-800 mb-0.5">Test mode — Stripe test cards</p>
-              <p className="text-amber-700 font-mono text-xs">4242 4242 4242 4242 · Orice dată viitoare · Orice CVC</p>
-            </div>
+        {/* Footer trust line */}
+        <div className="flex flex-col items-center gap-2 pb-6">
+          <div className="flex items-center gap-2 text-sm" style={{ color: "#6B7280" }}>
+            <Lock size={14} />
+            <span>Plată securizată prin Stripe. Anulezi oricând.</span>
           </div>
-        )}
-
-        <p className="text-center text-xs text-muted-foreground pb-8">
-          Prețurile sunt afișate fără TVA. Poți anula abonamentul oricând din Setări.
-        </p>
+          <p className="text-xs" style={{ color: "#9CA3AF" }}>Acceptăm: Visa · Mastercard · Apple Pay</p>
+        </div>
       </div>
     </div>
   );

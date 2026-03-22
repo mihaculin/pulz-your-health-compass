@@ -274,7 +274,28 @@ export default function SettingsPage() {
                 {conditions.map((c) => <span key={c} className="chip-biometric px-2.5 py-1 rounded-full text-xs">{c}</span>)}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-2">{t("settings.startedLabel")} {joinedWeeksAgo} {t("settings.personalData.weeksAgo")}</p>
+            <div className="flex items-center gap-2 mt-2">
+            {isPremium ? (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#DCFCE7", color: "#15803D" }}>
+                Plan: Premium ✓
+              </span>
+            ) : (
+              <>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: "#F3F4F6", color: "#6B7280" }}>
+                  Plan: Free
+                </span>
+                <button onClick={() => navigate("/pricing")} className="text-xs font-semibold" style={{ color: "#2D7D6F" }}>
+                  Vezi planurile →
+                </button>
+              </>
+            )}
+          </div>
+          {isPremium && subscriptionEndDate && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Activ până la: {new Date(subscriptionEndDate).toLocaleDateString("ro-RO")}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">{t("settings.startedLabel")} {joinedWeeksAgo} {t("settings.personalData.weeksAgo")}</p>
           </div>
         </div>
       </div>
@@ -518,6 +539,24 @@ export default function SettingsPage() {
         >
           {t("settings.deleteData")}
         </button>
+
+        {isPremium && (
+          <button
+            onClick={async () => {
+              if (!user) return;
+              await supabase.from("client_profiles").update({
+                subscription_tier: "free",
+                subscription_status: "inactive",
+                subscription_end_date: null,
+              }).eq("id", user.id);
+              refreshProfile();
+              toast({ description: "Resetat la Free ✓", className: "bg-white border-l-2 border-l-[#b3ecec]" });
+            }}
+            className="text-xs text-muted-foreground hover:underline transition-all"
+          >
+            Resetează la Free (demo)
+          </button>
+        )}
       </div>
 
       {/* ─── CRISIS CONTACT CARD ─── */}

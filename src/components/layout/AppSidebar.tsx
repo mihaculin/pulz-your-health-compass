@@ -99,18 +99,14 @@ export function AppSidebar() {
       </SidebarContent>
 
       <div style={{ borderTop: "1px solid #E8EAED" }}>
-        {!isPremium && (
+        {!collapsed && !isPremium && (
           <button
             onClick={() => navigate("/pricing")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-all hover:opacity-90 active:scale-[0.97] ${collapsed ? "justify-center" : ""}`}
-            style={{ background: "linear-gradient(135deg, #b3ecec, #D7C9DB)" }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 transition-all hover:opacity-90 active:scale-[0.97]"
+            style={{ backgroundColor: "#b3ecec", color: "#2D7D6F" }}
           >
-            <Sparkles size={15} style={{ color: "#1A4040" }} />
-            {!collapsed && (
-              <span className="text-xs font-semibold" style={{ color: "#1A4040" }}>
-                Upgrade la Premium
-              </span>
-            )}
+            <Sparkles size={14} />
+            <span className="text-xs font-semibold">Upgrade to Premium</span>
           </button>
         )}
         <button
@@ -131,7 +127,22 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{fullName || "—"}</p>
-              <p className="text-xs text-muted-foreground truncate">{weeksLabel}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {isPremium ? (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#DCFCE7", color: "#15803D" }}>
+                    Premium ✓
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#F3F4F6", color: "#6B7280" }}>
+                      Free
+                    </span>
+                    <button onClick={() => navigate("/pricing")} className="text-[10px] font-semibold" style={{ color: "#2D7D6F" }}>
+                      Upgrade →
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
