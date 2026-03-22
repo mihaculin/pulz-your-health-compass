@@ -52,7 +52,7 @@ interface SelfReport {
   meal_skipped: boolean | null;
 }
 
-function parseContext(ctx: string | null): { episode_type?: string; occurred?: string; other_trigger?: string } {
+function parseContext(ctx: string | null): { episode_type?: string; episode_types?: string[]; occurred?: string; other_trigger?: string } {
   if (!ctx) return {};
   try { return JSON.parse(ctx); } catch { return {}; }
 }
@@ -64,7 +64,7 @@ export default function Journal() {
   const { t } = useLanguage();
 
   const [occurred, setOccurred] = useState("");
-  const [episodeType, setEpisodeType] = useState("");
+  const [episodeTypes, setEpisodeTypes] = useState<string[]>([]);
   const [otherType, setOtherType] = useState("");
   const [whenDate, setWhenDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [whenTime, setWhenTime] = useState(() => new Date().toTimeString().slice(0, 5));
@@ -106,23 +106,26 @@ export default function Journal() {
     setSaving(true);
 
     const ts = new Date(`${whenDate}T${whenTime}`);
-    const effectiveType = episodeType === "Other" ? otherType : episodeType;
+    const selectedEpisodeTypes = episodeTypes
+      .map((t) => (t === "Other" ? (otherType || "Other") : t))
+      .filter((t) => t.trim().length > 0);
 
     await supabase.from("self_reports").insert({
       user_id: user.id,
       timestamp: ts.toISOString(),
       urge_level: intensity,
-      binge_occurred: episodeType === "Binge" && occurred === "Yes",
-      purge_occurred: episodeType === "Purge" && occurred === "Yes",
-      overeating_occurred: episodeType === "Overeating" && occurred === "Yes",
-      meal_skipped: episodeType === "Restriction" && occurred === "Yes",
+      binge_occurred: occurred === "Yes" && episodeTypes.includes("Binge"),
+      purge_occurred: occurred === "Yes" && episodeTypes.includes("Purge"),
+      overeating_occurred: occurred === "Yes" && episodeTypes.includes("Overeating"),
+      meal_skipped: occurred === "Yes" && episodeTypes.includes("Restriction"),
       triggers: triggers.includes("Other") && otherTrigger
         ? [...triggers.filter((tr) => tr !== "Other"), otherTrigger]
         : triggers,
       emotional_state: afterEmotions,
       notes: notes || null,
       location_context: JSON.stringify({
-        episode_type: effectiveType,
+        episode_types: selectedEpisodeTypes,
+        episode_type: selectedEpisodeTypes[0] ?? null,
         occurred,
         other_trigger: otherTrigger || null,
       }),
@@ -138,7 +141,7 @@ export default function Journal() {
       .limit(20);
     if (fresh) setPastEntries(fresh as SelfReport[]);
 
-    setOccurred(""); setEpisodeType(""); setOtherType(""); setIntensity(5);
+    setOccurred(""); setEpisodeTypes([]); setOtherType(""); setIntensity(5);
     setTriggers([]); setOtherTrigger(""); setAfterEmotions([]); setNotes("");
     setSaving(false);
   };
@@ -175,10 +178,10 @@ export default function Journal() {
             <label className="text-sm font-medium block">{t("journal.episodeType")}</label>
             <div className="flex flex-wrap gap-2">
               {EPISODE_TYPES.map((ep) => (
-                <Chip key={ep} label={ep} selected={episodeType === ep} onToggle={() => setEpisodeType(episodeType === ep ? "" : ep)} />
+                <Chip key={ep} label={ep} selected={episodeTypes.includes(ep)} onToggle={() => toggleArr(episodeTypes, setEpisodeTypes, ep)} />
               ))}
             </div>
-            {episodeType === "Other" && (
+            {episodeTypes.includes("Other") && (
               <input value={otherType} onChange={(e) => setOtherType(e.target.value)} placeholder={t("journal.describeEpisode")} className={inputCls} />
             )}
           </div>
@@ -250,7 +253,9 @@ export default function Journal() {
             const ctx = parseContext(entry.location_context);
             const isShared = sharedMap[entry.id] ?? false;
             const ts = new Date(entry.timestamp);
-            const label = ctx.episode_type ?? (entry.binge_occurred ? "Binge" : entry.purge_occurred ? "Purge" : entry.overeating_occurred ? "Overeating" : entry.meal_skipped ? "Restriction" : "Moment");
+            const label = (ctx.episode_types && ctx.episode_types.length > 0)
+              ? ctx.episode_types.join(", ")
+              : ctx.episode_type ?? (entry.binge_occurred ? "Binge" : entry.purge_occurred ? "Purge" : entry.overeating_occurred ? "Overeating" : entry.meal_skipped ? "Restriction" : "Moment");
             const occ = ctx.occurred ?? "—";
 
             return (
