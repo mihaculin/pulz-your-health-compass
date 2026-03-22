@@ -15,7 +15,9 @@ struct ContentView: View {
                 AuthFlowView(session: session)
             }
         }
+        .preferredColorScheme(.light)
         .task {
+            await session.restoreSessionIfNeeded()
             if session.isAuthenticated && session.screen == .dashboard {
                 await dashboard.start()
             }
@@ -175,6 +177,12 @@ private struct DashboardTabs: View {
                 .tag(3)
         }
         .tint(PulzPalette.petrol)
+        .background(
+            PulzBackground()
+                .ignoresSafeArea()
+        )
+        .toolbarBackground(PulzPalette.bg, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .sheet(item: $activeRecoveryTool) { tool in
             RecoveryToolSheet(tool: tool, message: viewModel.recoveryMessage)
         }
@@ -207,11 +215,16 @@ private struct DashboardHomeView: View {
                 }
                 .padding(20)
             }
+            .background(Color.clear)
             .navigationBarHidden(true)
             .refreshable {
                 await viewModel.refreshLiveState()
             }
         }
+        .background(
+            PulzBackground()
+                .ignoresSafeArea()
+        )
     }
 
     private var pendingTrainingEvent: ImpulseEvent? {
@@ -743,10 +756,6 @@ private struct OnboardingFlowView: View {
 
     private var personaliseStep: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Choose your theme")
-                .font(PulzType.body(14, weight: .semibold))
-            chipGrid(session.themeOptions, selected: Set([session.selectedTheme])) { session.selectedTheme = $0 }
-
             Text("How would you like PULZ to speak to you?")
                 .font(PulzType.body(14, weight: .semibold))
             chipGrid(session.toneOptions, selected: Set([session.selectedTone])) { session.selectedTone = $0 }
@@ -889,6 +898,10 @@ private struct JournalView: View {
             .padding(20)
         }
         .onAppear(perform: loadEntries)
+        .background(
+            PulzBackground()
+                .ignoresSafeArea()
+        )
     }
 
     private func chipGrid(_ options: [String], selected: Set<String>, action: @escaping (String) -> Void) -> some View {
@@ -900,6 +913,10 @@ private struct JournalView: View {
                 .buttonStyle(PulzChipButtonStyle(selected: selected.contains(option)))
             }
         }
+        .background(
+            PulzBackground()
+                .ignoresSafeArea()
+        )
     }
 
     private func toggle(_ set: inout Set<String>, value: String) {
@@ -1047,6 +1064,10 @@ private struct ProgressPage: View {
             }
             .padding(20)
         }
+        .background(
+            PulzBackground()
+                .ignoresSafeArea()
+        )
     }
 
     private func rangePill(_ title: String) -> some View {
@@ -1394,7 +1415,8 @@ private struct MyPulzView: View {
                     .foregroundStyle(PulzPalette.soft)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .multilineTextAlignment(.leading)
             .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1429,9 +1451,12 @@ private struct MyPulzView: View {
                 Text(subtitle)
                     .font(PulzType.body(11))
                     .foregroundStyle(PulzPalette.soft)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.9)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 104, maxHeight: 104, alignment: .leading)
+            .multilineTextAlignment(.leading)
             .background(selected ? PulzPalette.aquaMist : Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)

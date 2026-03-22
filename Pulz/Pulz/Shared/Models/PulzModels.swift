@@ -84,7 +84,7 @@ enum TrainingLabel: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
-    var storedValue: String {
+    nonisolated var storedValue: String {
         switch self {
         case .confirmed:
             return "confirmed_episode"

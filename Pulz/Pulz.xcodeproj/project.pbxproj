@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FE02C7642F6F414900898C43 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = FE02C7632F6F414900898C43 /* Auth */; };
+		FE02C7662F6F414900898C43 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = FE02C7652F6F414900898C43 /* Functions */; };
+		FE02C7682F6F414900898C43 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = FE02C7672F6F414900898C43 /* PostgREST */; };
+		FE02C76A2F6F414900898C43 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = FE02C7692F6F414900898C43 /* Realtime */; };
+		FE02C76C2F6F414900898C43 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = FE02C76B2F6F414900898C43 /* Storage */; };
+		FE02C76E2F6F414900898C43 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = FE02C76D2F6F414900898C43 /* Supabase */; };
 		FE5971D22F6E8E3C00B4AD76 /* Pulz Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = FE5971D12F6E8E3C00B4AD76 /* Pulz Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -39,14 +45,37 @@
 		FE5971D12F6E8E3C00B4AD76 /* Pulz Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Pulz Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		FE02C7722F6F611300898C43 /* Exceptions for "Pulz" folder in "Pulz" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = FE5971C32F6E8E3A00B4AD76 /* Pulz */;
+		};
+		FE02C7742F6F622E00898C43 /* Exceptions for "Pulz Watch App" folder in "Pulz Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Pulz-Watch-App-Info.plist",
+			);
+			target = FE5971D02F6E8E3C00B4AD76 /* Pulz Watch App */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		FE5971C62F6E8E3A00B4AD76 /* Pulz */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				FE02C7722F6F611300898C43 /* Exceptions for "Pulz" folder in "Pulz" target */,
+			);
 			path = Pulz;
 			sourceTree = "<group>";
 		};
 		FE5971D52F6E8E3C00B4AD76 /* Pulz Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				FE02C7742F6F622E00898C43 /* Exceptions for "Pulz Watch App" folder in "Pulz Watch App" target */,
+			);
 			path = "Pulz Watch App";
 			sourceTree = "<group>";
 		};
@@ -62,6 +91,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FE02C7682F6F414900898C43 /* PostgREST in Frameworks */,
+				FE02C7662F6F414900898C43 /* Functions in Frameworks */,
+				FE02C76E2F6F414900898C43 /* Supabase in Frameworks */,
+				FE02C7642F6F414900898C43 /* Auth in Frameworks */,
+				FE02C76C2F6F414900898C43 /* Storage in Frameworks */,
+				FE02C76A2F6F414900898C43 /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,12 +110,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FE02C7622F6F411A00898C43 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		FE5971BB2F6E8E3A00B4AD76 = {
 			isa = PBXGroup;
 			children = (
 				FE5971E52F6E8E3D00B4AD76 /* Shared */,
 				FE5971C62F6E8E3A00B4AD76 /* Pulz */,
 				FE5971D52F6E8E3C00B4AD76 /* Pulz Watch App */,
+				FE02C7622F6F411A00898C43 /* Frameworks */,
 				FE5971C52F6E8E3A00B4AD76 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -117,6 +160,12 @@
 			);
 			name = Pulz;
 			packageProductDependencies = (
+				FE02C7632F6F414900898C43 /* Auth */,
+				FE02C7652F6F414900898C43 /* Functions */,
+				FE02C7672F6F414900898C43 /* PostgREST */,
+				FE02C7692F6F414900898C43 /* Realtime */,
+				FE02C76B2F6F414900898C43 /* Storage */,
+				FE02C76D2F6F414900898C43 /* Supabase */,
 			);
 			productName = Pulz;
 			productReference = FE5971C42F6E8E3A00B4AD76 /* Pulz.app */;
@@ -350,12 +399,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Pulz Watch App/Pulz Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = V3BTT9266V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Pulz-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Pulz;
+				INFOPLIST_KEY_NSHealthClinicalHealthRecordsShareUsageDescription = "To use Pulz and benefit from it's features across your apple ecosystem the app requiers access to HealthKit in order to sync the data with the app.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pulz reads heart rate, activity, and wrist temperature trends to detect stress patterns on your watch.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pulz may save mindful recovery sessions and related wellness data you choose to share.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -376,7 +428,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+				WATCHOS_DEPLOYMENT_TARGET = 11.6;
 			};
 			name = Debug;
 		};
@@ -385,12 +437,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Pulz Watch App/Pulz Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = V3BTT9266V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Pulz-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Pulz;
+				INFOPLIST_KEY_NSHealthClinicalHealthRecordsShareUsageDescription = "To use Pulz and benefit from it's features across your apple ecosystem the app requiers access to HealthKit in order to sync the data with the app.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pulz reads heart rate, activity, and wrist temperature trends to detect stress patterns on your watch.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pulz may save mindful recovery sessions and related wellness data you choose to share.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -412,7 +467,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				VALIDATE_PRODUCT = YES;
-				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+				WATCHOS_DEPLOYMENT_TARGET = 11.6;
 			};
 			name = Release;
 		};
@@ -421,12 +476,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Pulz/Pulz.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = V3BTT9266V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Pulz/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Pulz;
+				INFOPLIST_KEY_NSHealthClinicalHealthRecordsShareUsageDescription = "To use Pulz and benefit from it's features across your apple ecosystem the app requiers access to HealthKit in order to sync the data with the app.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pulz reads Apple Watch wellness data to help surface emotional impulse patterns on your iPhone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pulz may save wellness entries you trigger during recovery tools.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -434,7 +492,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -458,12 +516,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Pulz/Pulz.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = V3BTT9266V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Pulz/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Pulz;
+				INFOPLIST_KEY_NSHealthClinicalHealthRecordsShareUsageDescription = "To use Pulz and benefit from it's features across your apple ecosystem the app requiers access to HealthKit in order to sync the data with the app.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pulz reads Apple Watch wellness data to help surface emotional impulse patterns on your iPhone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pulz may save wellness entries you trigger during recovery tools.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -471,7 +532,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -533,6 +594,39 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FE02C7632F6F414900898C43 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE562C3D2F6F1DCC004FD203 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		FE02C7652F6F414900898C43 /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE562C3D2F6F1DCC004FD203 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		FE02C7672F6F414900898C43 /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE562C3D2F6F1DCC004FD203 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		FE02C7692F6F414900898C43 /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE562C3D2F6F1DCC004FD203 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		FE02C76B2F6F414900898C43 /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE562C3D2F6F1DCC004FD203 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		FE02C76D2F6F414900898C43 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FE562C3D2F6F1DCC004FD203 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FE5971BC2F6E8E3A00B4AD76 /* Project object */;
 }

@@ -84,6 +84,9 @@ final class PulzDashboardViewModel {
         if let receivedEvent = connectivity.receivedEvent, shouldInsert(event: receivedEvent, into: events) {
             events.insert(receivedEvent, at: 0)
             stateOverride = receivedEvent.state
+#if os(iOS)
+            await SupabaseSyncHub.shared.send(event: receivedEvent)
+#endif
         } else if let event = detection.event, shouldInsert(event: event, into: events) {
             events.insert(event, at: 0)
             await notificationManager.sendImpulseAlert(for: event.state)
@@ -91,6 +94,9 @@ final class PulzDashboardViewModel {
                 await notificationManager.sendImpulseAlert(for: event.state, followUp: true)
                 connectivity.send(event: event)
             }
+#if os(iOS)
+            await SupabaseSyncHub.shared.send(event: event)
+#endif
         }
 
         snapshot = DashboardSnapshot(
@@ -107,6 +113,9 @@ final class PulzDashboardViewModel {
         )
 
         connectivity.send(sample: nextSample, state: detection.state)
+#if os(iOS)
+        await SupabaseSyncHub.shared.send(sample: nextSample, state: detection.state)
+#endif
     }
 
     func setTag(_ tag: ImpulseTag) {

@@ -53,6 +53,7 @@ final class AppSessionViewModel {
     var authErrorMessage: String?
     var isSubmitting = false
     private(set) var account: AuthAccount?
+    private var hasAttemptedRestore = false
 
     var dateOfBirth = Date.now.addingTimeInterval(-86400 * 365 * 27)
     var heightText = ""
@@ -81,6 +82,8 @@ final class AppSessionViewModel {
     var crisisContactName = ""
     var crisisContactPhone = ""
     var safetyConsent = false
+    var recentRiskWindows: [RiskWindowRecord] = []
+    var recentInterventions: [InterventionEventRecord] = []
 
     let concernOptions = [
         "Binge eating",
@@ -120,7 +123,11 @@ final class AppSessionViewModel {
     private let environment: AppEnvironment
 
     init(environment: AppEnvironment? = nil) {
+#if os(iOS)
+        self.environment = environment ?? .live
+#else
         self.environment = environment ?? .local
+#endif
     }
 
     func showSignIn() {
@@ -143,6 +150,8 @@ final class AppSessionViewModel {
             let account = try await environment.authService.signIn(email: email, password: password)
             self.account = account
             fullName = account.fullName
+            let bootstrap = await environment.profileSyncService.fetchBootstrap(for: account)
+            applyBootstrap(bootstrap)
             authErrorMessage = nil
             isAuthenticated = true
             screen = onboardingCompleted ? .dashboard : .onboarding
@@ -163,11 +172,29 @@ final class AppSessionViewModel {
         do {
             let account = try await environment.authService.signUp(email: email, password: password, fullName: fullName)
             self.account = account
+            await environment.profileSyncService.prepareNewUser(account: account, fullName: fullName)
+            let bootstrap = await environment.profileSyncService.fetchBootstrap(for: account)
+            applyBootstrap(bootstrap)
             authErrorMessage = nil
             isAuthenticated = true
             screen = .onboarding
         } catch {
             authErrorMessage = error.localizedDescription
+        }
+    }
+
+    func restoreSessionIfNeeded() async {
+        guard !hasAttemptedRestore else { return }
+        hasAttemptedRestore = true
+        guard !isAuthenticated else { return }
+
+        if let account = await environment.authService.currentAccount() {
+            self.account = account
+            fullName = account.fullName
+            let bootstrap = await environment.profileSyncService.fetchBootstrap(for: account)
+            applyBootstrap(bootstrap)
+            isAuthenticated = true
+            screen = onboardingCompleted ? .dashboard : .onboarding
         }
     }
 
@@ -259,5 +286,44 @@ final class AppSessionViewModel {
         email = ""
         password = ""
         account = nil
+    }
+
+    private func applyBootstrap(_ bootstrap: BootstrapSnapshot) {
+        if let name = bootstrap.profile?.fullName ?? bootstrap.personalisation?.fullName {
+            fullName = name
+        }
+        if let dateString = bootstrap.personalisation?.dateOfBirth,
+           let parsedDate = SupabasePayloadsHelper.isoDate(from: dateString) {
+            dateOfBirth = parsedDate
+        }
+        if let concerns = bootstrap.personalisation?.selectedConcerns, !concerns.isEmpty {
+            selectedConcerns = Set(concerns)
+        }
+        if let triggers = bootstrap.personalisation?.commonTriggers, !triggers.isEmpty {
+            commonTriggers = Set(triggers)
+        }
+        if let device = bootstrap.personalisation?.selectedDevice {
+            selectedDevice = device
+        }
+        if let theme = bootstrap.personalisation?.selectedTheme {
+            selectedTheme = theme
+        }
+        if let tone = bootstrap.personalisation?.selectedTone {
+            selectedTone = tone
+        }
+        if let message = bootstrap.personalisation?.supportMessage {
+            firstSupportMessage = message
+        }
+        if bootstrap.personalisation != nil {
+            onboardingCompleted = true
+        }
+        recentRiskWindows = bootstrap.recentRiskWindows
+        recentInterventions = bootstrap.recentInterventions
+    }
+}
+
+private enum SupabasePayloadsHelper {
+    static func isoDate(from string: String) -> Date? {
+        ISO8601DateFormatter().date(from: string)
     }
 }

@@ -6,10 +6,16 @@
 	<string>UseAppPreferences</string>
 	<key>CompilationCachingSetting</key>
 	<string>Default</string>
+	<key>CustomBuildIntermediatesPath</key>
+	<string>/Users/victorchironachi/Desktop/Build/Intermediates.noindex</string>
 	<key>CustomBuildLocationType</key>
-	<string>RelativeToDerivedData</string>
+	<string>Absolute</string>
+	<key>CustomBuildProductsPath</key>
+	<string>/Users/victorchironachi/Desktop/Build/Products</string>
 	<key>DerivedDataLocationStyle</key>
 	<string>Default</string>
+	<key>SharedBuildFolderName</key>
+	<string>Build</string>
 	<key>ShowSharedSchemesAutomaticallyEnabled</key>
 	<true/>
 </dict>
